@@ -1,0 +1,58 @@
+{
+  "dependencies": {
+    "@types/node": "12.0.2",
+    "aws-sdk": "^2.546.0",
+    "ion-hash-js": "0.1.0-SNAPSHOT",
+    "ion-js": "^3.0.0",
+    "semaphore-async-await": "^1.5.1",
+    "stream": "0.0.2"
+  },
+  "name": "qldb-node-client",
+  "description": "A Node.js client for working with Quantum Ledger Database",
+  "version": "0.0.0",
+  "main": "src/index.ts",
+  "devDependencies": {
+    "@types/chai": "^4.1.7",
+    "@types/mocha": "^5.2.7",
+    "@types/sinon": "^7.0.13",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "grunt": "^1.0.4",
+    "mocha": "^6.2.0",
+    "nyc": "^14.1.1",
+    "sinon": "^7.3.2",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3"
+  },
+  "scripts": {
+    "test": "mocha -r ts-node/register src/**/*.test.ts",
+    "testWithCoverage": "nyc -r lcov -e .ts -x \"*.test.ts\" mocha -r ts-node/register src/**/*.test.ts && nyc report"
+  },
+  "author": {
+    "name": "Amazon Web Services",
+    "url": "https://aws.amazon.com/"
+  },
+  "license": "Apache-2.0",
+  "keywords": [
+    "api",
+    "amazon",
+    "aws",
+    "qldb",
+    "s3",
+    "lambda",
+    "ledger",
+    "iam"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "TODO:addURL"
+  },
+  "nyc": {
+    "exclude": [
+      "aws-sdk/*"
+    ],
+    "include": [
+      "src"
+    ]
+  }
+}
