@@ -40,7 +40,7 @@ export class Result {
      * @returns Promise which fulfills with a Result.
      */
     static async create(txnId: string, page: Page, communicator: Communicator): Promise<Result> {
-        let resultList: Reader[] = await Result._fetchResultPages(txnId, page, communicator);
+        const resultList: Reader[] = await Result._fetchResultPages(txnId, page, communicator);
         return new Result(resultList);
     }
 
@@ -50,7 +50,7 @@ export class Result {
      * @returns Promise which fulfills with a Result.
      */
     static async bufferResultStream(resultStream: ResultStream): Promise<Result> {
-        let resultList: Reader[] = await Result._readResultStream(resultStream);
+        const resultList: Reader[] = await Result._readResultStream(resultStream);
         return new Result(resultList);
     }
 
@@ -76,10 +76,10 @@ export class Result {
         if (ionBinary instanceof Uint8Array) {
             return <Uint8Array> ionBinary;
         }
-        if (typeof ionBinary === 'string') {
+        if (typeof ionBinary === "string") {
             return <string> ionBinary;
         }
-        throw new ClientException('Unexpected Blob returned from QLDB.');
+        throw new ClientException("Unexpected Blob returned from QLDB.");
     }
 
     /**
@@ -91,7 +91,7 @@ export class Result {
      */
     private static async _fetchResultPages(txnId: string, page: Page, communicator: Communicator): Promise<Reader[]> {
         let currentPage: Page = page;
-        let pageValuesArray: ValueHolder[][] = [];
+        const pageValuesArray: ValueHolder[][] = [];
         if (currentPage.Values && currentPage.Values.length > 0) {
             pageValuesArray.push(currentPage.Values);
         }
@@ -101,12 +101,12 @@ export class Result {
                 pageValuesArray.push(currentPage.Values);
             }
         }
-        let readerList: Reader[] = [];
-        for (let pageIndex: number = 0; pageIndex < pageValuesArray.length; pageIndex++) {
-            for (let valueIndex: number = 0; valueIndex < pageValuesArray[pageIndex].length; valueIndex++) {
-                readerList.push(makeReader(Result._handleBlob(pageValuesArray[pageIndex][valueIndex].IonBinary)));
-            }
-        }
+        const readerList: Reader[] = [];
+        pageValuesArray.forEach((valueHolders: ValueHolder[]) => {
+            valueHolders.forEach((valueHolder: ValueHolder) => {
+                readerList.push(makeReader(Result._handleBlob(valueHolder.IonBinary)));
+            });
+        });
         return readerList;
     }
 

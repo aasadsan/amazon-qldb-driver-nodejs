@@ -12,8 +12,7 @@
  */
 
 import { QLDBSession } from "aws-sdk";
-import { ClientApiVersions } from "aws-sdk/clients/textract";
-import { ServiceConfigurationOptions } from "aws-sdk/lib/service";
+import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 
 import { Communicator } from "./Communicator";
 import { DriverClosedError } from "./errors/Errors";
@@ -22,42 +21,38 @@ import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
 
 /**
- * Represents a factory for creating sessions to a specific ledger within QLDB. This class or 
- * {@linkcode PooledQldbDriver} should be the main entry points to any interaction with QLDB. 
- * {@linkcode QldbDriver.getSession} will create a {@linkcode QldbSession} to the specified edger within QLDB as a 
+ * Represents a factory for creating sessions to a specific ledger within QLDB. This class or
+ * {@linkcode PooledQldbDriver} should be the main entry points to any interaction with QLDB.
+ * {@linkcode QldbDriver.getSession} will create a {@linkcode QldbSession} to the specified edger within QLDB as a
  * communication channel. Any sessions acquired should be cleaned up with {@linkcode QldbSession.close} to free up
  * resources.
- * 
- * This factory does not attempt to re-use or manage sessions in any way. It is recommended to use 
+ *
+ * This factory does not attempt to re-use or manage sessions in any way. It is recommended to use
  * {@linkcode PooledQldbDriver} for both less resource usage and lower latency.
  */
 export class QldbDriver {
-    protected _lowLevelClient: QLDBSession;
+    protected _qldbClient: QLDBSession;
     protected _ledgerName: string;
-    protected _retryLimit: number; 
+    protected _retryLimit: number;
     protected _isClosed: boolean;
 
     /**
      * Creates a QldbDriver.
-     * @param lowLevelClientOptions The object containing options for configuring the low level client. 
-     *                              See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/QLDBSession.html#constructor-details|Low Level Client Constructor}. 
+     * @param qldbClientOptions The object containing options for configuring the low level client.
+     *                          See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/QLDBSession.html#constructor-details|Low Level Client Constructor}.
      * @param ledgerName The QLDB ledger name.
      * @param retryLimit The number of automatic retries for statement executions using convenience methods on sessions
                          when an OCC conflict or retriable exception occurs. This value must not be negative.
      * @throws RangeError if `retryLimit` is less than 0.
      */
-    constructor(
-        lowLevelClientOptions: ServiceConfigurationOptions & ClientApiVersions,
-        ledgerName: string,
-        retryLimit: number = 4
-    ) {
+    constructor(qldbClientOptions: ClientConfiguration, ledgerName: string, retryLimit: number = 4) {
         if (retryLimit < 0) {
-            throw new RangeError("The retry limit number cannot be negative.");
+            throw new RangeError("Value for retryLimit cannot be negative.");
         }
-        lowLevelClientOptions.customUserAgent = `QLDB Driver for Node.js v${process.env.npm_package_version}`;
-        lowLevelClientOptions.maxRetries = 0;
-	
-        this._lowLevelClient = new QLDBSession(lowLevelClientOptions);
+        qldbClientOptions.customUserAgent = `QLDB Driver for Node.js v${process.env.npm_package_version}`;
+        qldbClientOptions.maxRetries = 0;
+
+        this._qldbClient = new QLDBSession(qldbClientOptions);
         this._ledgerName = ledgerName;
         this._retryLimit = retryLimit;
         this._isClosed = false;
@@ -66,7 +61,7 @@ export class QldbDriver {
     /**
      * Close this driver.
      */
-    close() {
+    close(): void {
         this._isClosed = true;
     }
 
@@ -80,7 +75,7 @@ export class QldbDriver {
             throw new DriverClosedError();
         }
         debug("Creating a new session.");
-        let communicator: Communicator = await Communicator.create(this._lowLevelClient, this._ledgerName);
+        const communicator: Communicator = await Communicator.create(this._qldbClient, this._ledgerName);
         return new QldbSessionImpl(communicator, this._retryLimit);
     }
 }

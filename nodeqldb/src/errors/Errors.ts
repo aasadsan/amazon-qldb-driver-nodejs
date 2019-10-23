@@ -25,7 +25,7 @@ class ClientException extends Error {
 
 class DriverClosedError extends Error {
     constructor() {
-        let message: string = "Cannot invoke methods on a closed driver. Please create a new driver and retry.";
+        const message: string = "Cannot invoke methods on a closed driver. Please create a new driver and retry.";
         super(message);
         Object.setPrototypeOf(this, DriverClosedError.prototype)
         this.message = message;
@@ -36,7 +36,7 @@ class DriverClosedError extends Error {
 
 class LambdaAbortedError extends Error {
     constructor() {
-        let message: string = "Abort called. Halting execution of lambda function.";
+        const message: string = "Abort called. Halting execution of lambda function.";
         super(message);
         Object.setPrototypeOf(this, LambdaAbortedError.prototype)
         this.message = message;
@@ -47,7 +47,7 @@ class LambdaAbortedError extends Error {
 
 class SessionClosedError extends Error {
     constructor() {
-        let message: string = "Cannot invoke methods on a closed QldbSession. Please create a new session and retry.";
+        const message: string = "Cannot invoke methods on a closed QldbSession. Please create a new session and retry.";
         super(message);
         Object.setPrototypeOf(this, SessionClosedError.prototype)
         this.message = message;
@@ -58,8 +58,9 @@ class SessionClosedError extends Error {
 
 class SessionPoolEmptyError extends Error {
     constructor(timeout: number) {
-        let message: string = `Session pool is empty after waiting for ${timeout} milliseconds. Please close existing` +
-        `sessions first before retrying.`;
+        const message: string =
+            `Session pool is empty after waiting for ${timeout} milliseconds. Please close existing sessions first ` +
+            "before retrying.";
         super(message);
         Object.setPrototypeOf(this, SessionPoolEmptyError.prototype)
         this.message = message;
@@ -70,7 +71,7 @@ class SessionPoolEmptyError extends Error {
 
 class TransactionClosedError extends Error {
     constructor() {
-        let message: string =
+        const message: string =
             "Cannot invoke methods on a closed Transaction. Please create a new transaction and retry.";
         super(message);
         Object.setPrototypeOf(this, TransactionClosedError.prototype)
@@ -108,27 +109,46 @@ function isOccConflictException(e): boolean {
 }
 
 /**
+ * Is the exception a ResourceNotFoundException?
+ * @param e The client error to check to see if it is a ResourceNotFoundException.
+ * @returns Whether or not the exception is a ResourceNotFoundException.
+ */
+function isResourceNotFoundException(e): boolean {
+    return e.code === "ResourceNotFoundException";
+}
+
+/**
+ * Is the exception a ResourcePreconditionNotMetException?
+ * @param e The client error to check to see if it is a ResourcePreconditionNotMetException.
+ * @returns Whether or not the exception is a ResourcePreconditionNotMetException.
+ */
+function isResourcePreconditionNotMetException(e): boolean {
+    return e.code === "ResourcePreconditionNotMetException";
+}
+
+/**
  * Is the exception a retriable exception?
  * @param e The client error caught.
  * @returns True if the exception is a retriable exception. False otherwise.
  */
 function isRetriableException(e): boolean {
-    let isRetriable: boolean = (e.statusCode === 500) ||
-                               (e.statusCode === 503) ||
-                               (e.code === "NoHttpResponseException") ||
-                               (e.code === "SocketTimeoutException");
-    return isRetriable;
+    return (e.statusCode === 500) ||
+           (e.statusCode === 503) ||
+           (e.code === "NoHttpResponseException") ||
+           (e.code === "SocketTimeoutException");
 }
 
-export { 
+export {
     ClientException,
     DriverClosedError,
     isInvalidParameterException,
     isInvalidSessionException,
     isOccConflictException,
+    isResourceNotFoundException,
+    isResourcePreconditionNotMetException,
     isRetriableException,
     LambdaAbortedError,
     SessionClosedError,
     SessionPoolEmptyError,
     TransactionClosedError
-}
+};

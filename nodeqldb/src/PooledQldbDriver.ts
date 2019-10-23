@@ -11,9 +11,7 @@
  * and limitations under the License.
  */
 
-import { ClientApiVersions } from "aws-sdk/clients/textract";
-import { ServiceConfigurationOptions } from "aws-sdk/lib/service";
-import { globalAgent } from "https";
+import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 import Semaphore from "semaphore-async-await";
 
 import { DriverClosedError, SessionPoolEmptyError } from "./errors/Errors";
@@ -24,56 +22,67 @@ import { QldbSessionImpl } from "./QldbSessionImpl";
 
 /**
  * Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
- * {@linkcode QldbDriver} should be the main entry points to any interaction with QLDB. 
- * {@linkcode PooledQldbDriver.getSession} will create a {@linkcode PooledQldbSession} to the specified ledger within 
- * QLDB as a communication channel. Any acquired sessions must be cleaned up with {@linkcode PooledQldbSession.close} 
- * when they are no longer needed in order to return the session to the pool. If this is not done, this driver may 
+ * {@linkcode QldbDriver} should be the main entry points to any interaction with QLDB.
+ * {@linkcode PooledQldbDriver.getSession} will create a {@linkcode PooledQldbSession} to the specified ledger within
+ * QLDB as a communication channel. Any acquired sessions must be cleaned up with {@linkcode PooledQldbSession.close}
+ * when they are no longer needed in order to return the session to the pool. If this is not done, this driver may
  * become unusable if the pool limit is exceeded.
  *
  * This factory pools sessions and attempts to return unused but available sessions when getting new sessions. The
  * advantage to using this over the non-pooling driver is that the underlying connection that sessions use to
  * communicate with QLDB can be recycled, minimizing resource usage by preventing unnecessary connections and reducing
  * latency by not making unnecessary requests to start new connections and end reusable, existing, ones.
- * 
+ *
  * The pool does not remove stale sessions until a new session is retrieved. The default pool size is the maximum
- * amount of connections the session client allows. {@linkcode PooledQldbDriver.close} should be called when this 
+ * amount of connections the session client allows. {@linkcode PooledQldbDriver.close} should be called when this
  * factory is no longer needed in order to clean up resources, ending all sessions in the pool.
  */
 export class PooledQldbDriver extends QldbDriver {
     private _poolLimit: number;
-    private _timeout: number;
+    private _timeoutMillis: number;
     private _availablePermits: number;
     private _sessionPool: QldbSessionImpl[];
     private _semaphore: Semaphore;
 
     /**
      * Creates a PooledQldbDriver.
-     * @param lowLevelClientOptions The object containing options for configuring the low level client. 
-     *                              See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/QLDBSession.html#constructor-details|Low Level Client Constructor}.
+     * @param qldbClientOptions The object containing options for configuring the low level client.
+     *                          See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/QLDBSession.html#constructor-details|Low Level Client Constructor}.
      * @param ledgerName The QLDB ledger name.
      * @param retryLimit The number of automatic retries for statement executions using convenience methods on sessions
                          when an OCC conflict or retriable exception occurs. This value must not be negative.
      * @param poolLimit The session pool limit. Set to `undefined` to use the maximum sockets from the `globalAgent`.
-     * @param timeout The timeout in milliseconds while attempting to retrieve a session from the session pool.
+     * @param timeoutMillis The timeout in milliseconds while attempting to retrieve a session from the session pool.
      * @throws RangeError if `retryLimit` is less than 0 or `poolLimit` is greater than the client limit.
      */
     constructor(
-        lowLevelClientOptions: ServiceConfigurationOptions & ClientApiVersions,
+        qldbClientOptions: ClientConfiguration,
         ledgerName: string,
         retryLimit: number = 4,
-        poolLimit: number = undefined,
-        timeout: number = 30000
+        poolLimit: number = 0,
+        timeoutMillis: number = 30000
     ) {
-        super(lowLevelClientOptions, ledgerName, retryLimit);
-        if (!poolLimit) {
-            poolLimit = globalAgent.maxSockets;
-        } else if (poolLimit > globalAgent.maxSockets) {
+        super(qldbClientOptions, ledgerName, retryLimit);
+        if (timeoutMillis < 0) {
+            throw new RangeError("Value for timeout cannot be negative.");
+        }
+        if (poolLimit < 0) {
+            throw new RangeError("Value for poolLimit cannot be negative.");
+        }
+
+        if (0 === poolLimit) {
+            this._poolLimit = qldbClientOptions.httpOptions.agent.maxSockets;
+        } else {
+            this._poolLimit = poolLimit;
+        }
+        if (this._poolLimit > qldbClientOptions.httpOptions.agent.maxSockets) {
             throw new RangeError(
-                `The pool limit can not be greater than the client limit of ${globalAgent.maxSockets}.`
+                `The session pool limit given, ${this._poolLimit}, exceeds the limit set by the client,
+                 ${qldbClientOptions.httpOptions.agent.maxSockets}. Please lower the limit and retry.`
             );
         }
-        this._poolLimit = poolLimit;
-        this._timeout = timeout;
+
+        this._timeoutMillis = timeoutMillis;
         this._availablePermits = this._poolLimit;
         this._sessionPool = [];
         this._semaphore = new Semaphore(this._poolLimit);
@@ -102,23 +111,23 @@ export class PooledQldbDriver extends QldbDriver {
             throw new DriverClosedError();
         }
         debug(
-            `Getting session. Current free session count: ${this._sessionPool.length}. ` + 
+            `Getting session. Current free session count: ${this._sessionPool.length}. ` +
             `Currently available permit count: ${this._availablePermits}.`
         );
-        let isPermitAcquired: boolean = await this._semaphore.waitFor(this._timeout);
+        const isPermitAcquired: boolean = await this._semaphore.waitFor(this._timeoutMillis);
         if (isPermitAcquired) {
             this._availablePermits--;
             while (this._sessionPool.length > 0) {
-                let session: QldbSessionImpl = this._sessionPool.pop();
-                let isSessionAvailable: boolean = await session._abortOrClose();
+                const session: QldbSessionImpl = this._sessionPool.pop();
+                const isSessionAvailable: boolean = await session._abortOrClose();
                 if (isSessionAvailable) {
-                    info(`Reusing session from pool.`)
+                    info("Reusing session from pool.")
                     return new PooledQldbSession(session, this._returnSessionToPool);
                 }
             }
             try {
                 info("Creating new pooled session.");
-                let newSession: QldbSessionImpl = <QldbSessionImpl> (await super.getSession());
+                const newSession: QldbSessionImpl = <QldbSessionImpl> (await super.getSession());
                 return new PooledQldbSession(newSession, this._returnSessionToPool);
             } catch (e) {
                 this._semaphore.release();
@@ -126,7 +135,7 @@ export class PooledQldbDriver extends QldbDriver {
                 throw e;
             }
         }
-        throw new SessionPoolEmptyError(this._timeout)
+        throw new SessionPoolEmptyError(this._timeoutMillis)
     }
 
     /**

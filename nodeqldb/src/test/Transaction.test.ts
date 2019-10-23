@@ -11,107 +11,172 @@
  * and limitations under the License.
  */
 
-import { 
-    CommitTransactionResult,
-    ExecuteStatementResult, 
-    Page, 
-    PageToken
-} from "aws-sdk/clients/qldbsession";
+import { CommitTransactionResult, ExecuteStatementResult, Page, PageToken } from "aws-sdk/clients/qldbsession";
+import * as chai from "chai";
+import * as chaiAsPromised from "chai-as-promised";
+import { toBase64, Writer } from "ion-js";
+import * as sinon from "sinon";
 
 import { Communicator } from "../Communicator";
 import * as Errors from "../errors/Errors";
 import * as logUtil from "../logUtil";
+import { QldbHash } from "../QldbHash";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
 
-const chai = require("chai");
-const chaiAsPromised = require("chai-as-promised");
 chai.use(chaiAsPromised);
-const sinon = require("sinon");
 const sandbox = sinon.createSandbox();
 
-let mockMessage: string = "foo";
-let mockMessage2: string = "bar";
-let mockStatement: string = "SELECT * FROM foo";
-let mockPageToken: PageToken = "foo";
+const testMessage: string = "foo";
+const testMessage2: string = "bar";
+const testStatement: string = "SELECT * FROM foo";
+const testPageToken: PageToken = "foo";
+const testTransactionId: string = "txnId";
+const testHash: Uint8Array = new Uint8Array([1, 2, 3]);
+const testCommitTransactionResult: CommitTransactionResult = {
+    TransactionId: testTransactionId,
+    CommitDigest: QldbHash.toQldbHash(testTransactionId).getQldbHash()
+};
+const pageToken: Page = {NextPageToken: testPageToken};
+const testExecuteStatementResult: ExecuteStatementResult = {
+    FirstPage: {
+        NextPageToken: testPageToken
+    }
+};
 
-describe('Transaction test', function() {
-    let mockCommunicator: Communicator = sandbox.mock(Communicator);
-    let mockExecuteStatementResult: ExecuteStatementResult = {FirstPage: {NextPageToken: mockPageToken}};
-    //TODO: Commit digest hash. 
-    let mockCommitTransactionResult: CommitTransactionResult = undefined
-    let mockResult: Result = sandbox.mock(Result);
-    let mockTransactionId: string = "txnId";
-    let pageToken: Page = {NextPageToken: mockPageToken};
-    let transaction: Transaction;
+const mockCommunicator: Communicator = <Communicator><any> sandbox.mock(Communicator);
+const mockResult: Result = <Result><any> sandbox.mock(Result);
 
-    beforeEach(function () {
-        transaction = new Transaction(mockCommunicator, mockTransactionId);
-        mockCommunicator.executeStatement = async function () {return mockExecuteStatementResult;};
-        mockCommunicator.commit = async function () {return mockCommitTransactionResult;};
-        mockCommunicator.abortTransaction = async function () {};
+let transaction: Transaction;
+
+describe("Transaction test", () => {
+
+    beforeEach(() => {
+        transaction = new Transaction(mockCommunicator, testTransactionId);
+        mockCommunicator.executeStatement = async () => {
+            return testExecuteStatementResult;
+        };
+        mockCommunicator.commit = async () => {
+            return testCommitTransactionResult;
+        };
+        mockCommunicator.abortTransaction = async () => {};
     });
 
-    after(function () {
+    afterEach(() => {
         sandbox.restore();
     });
-    
-    it('Test Get Transaction ID', function() {
-        let transactionIdSpy = sandbox.spy(transaction, "getTransactionId");
-        let transactionId: string = transaction.getTransactionId();
-        chai.assert.equal(transactionId, mockTransactionId);
-        sinon.assert.calledOnce(transactionIdSpy);
-    });
 
-    it('Test Abort', async function() {
-        let abortSpy = sandbox.spy(mockCommunicator, "abort");
+    it("Test abort", async () => {
+        const abortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
+        const transactionInternalCloseSpy = sandbox.spy(transaction as any, "_internalClose");
         await transaction.abort();
         await transaction.abort();
         sinon.assert.calledOnce(abortSpy);
+        sinon.assert.calledOnce(transactionInternalCloseSpy);
     });
 
-    it('Test Abort with Exception', async function() {
-        mockCommunicator.abortTransaction = async function () {throw new Error(mockMessage);};
-        let abortSpy = sandbox.spy(mockCommunicator, "abort");
+    it("Test abort with exception", async () => {
+        mockCommunicator.abortTransaction = async () => {
+            throw new Error(testMessage);
+        };
+        const abortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
         await chai.expect(transaction.abort()).to.be.rejected;
         sinon.assert.calledOnce(abortSpy);
     });
 
-    it('Test Commit', async function() {
-        let commitSpy = sandbox.spy(mockCommunicator, "commit");
+    it("Test abort after commit", async () => {
+        const abortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
+        await transaction.commit();
+        // This should be a no-op.
+        await transaction.abort();
+        sinon.assert.notCalled(abortSpy);
+    });
+
+    it("Test clearParameters", async () => {
+        const writer: Writer = transaction.registerParameter(1);
+        const closeSpy = sandbox.spy(writer, "close");
+        chai.assert.equal(transaction["_registeredParameters"].length, 1);
+        transaction.clearParameters();
+        chai.assert.equal(transaction["_registeredParameters"].length, 0);
+        sinon.assert.calledOnce(closeSpy);
+    });
+
+    it("Test clearParameters", async () => {
+        const writer: Writer = transaction.registerParameter(1);
+        writer.close = function() {
+            throw new Error(testMessage);
+        };
+        const warnSpy = sandbox.spy(logUtil, "warn");
+        chai.assert.equal(transaction["_registeredParameters"].length, 1);
+        transaction.clearParameters();
+        chai.assert.equal(transaction["_registeredParameters"].length, 0);
+        sinon.assert.calledOnce(warnSpy);
+    });
+
+    it("Test commit", async () => {
+        const commitSpy = sandbox.spy(mockCommunicator, "commit");
+        const transactionInternalCloseSpy = sandbox.spy(transaction as any, "_internalClose");
         await transaction.commit();
         sinon.assert.calledOnce(commitSpy);
+        sinon.assert.calledOnce(transactionInternalCloseSpy);
     });
 
-    it('Test Commit with Exception', async function() {
-        mockCommunicator.commit = async function () {throw new Error(mockMessage);};
-        let isOccStub = sandbox.stub(Errors, "isOccConflictException");
+    it("Test commit after commit", async () => {
+        const commitSpy = sandbox.spy(mockCommunicator, "commit");
+        await transaction.commit();
+        await chai.expect(transaction.commit()).to.be.rejected;
+        sinon.assert.calledOnce(commitSpy);
+    });
+
+    it("Test commit with non-matching hash", async () => {
+        const invalidHashCommitTransactionResult: CommitTransactionResult = {
+            TransactionId: testTransactionId,
+            CommitDigest: testHash
+        };
+        mockCommunicator.commit = async () => {
+            return invalidHashCommitTransactionResult;
+        };
+        const commitSpy = sandbox.spy(mockCommunicator, "commit");
+        const error = await chai.expect(transaction.commit()).to.be.rejected;
+        chai.assert.equal(error.name, "ClientException");
+        sinon.assert.calledOnce(commitSpy);
+    });
+
+    it("Test commit with exception", async () => {
+        mockCommunicator.commit = async () => {
+            throw new Error(testMessage);
+        };
+        const isOccStub = sandbox.stub(Errors, "isOccConflictException");
         isOccStub.returns(false);
-        let commitSpy = sandbox.spy(mockCommunicator, "commit");
+        const commitSpy = sandbox.spy(mockCommunicator, "commit");
         await chai.expect(transaction.commit()).to.be.rejected;
         sinon.assert.calledOnce(isOccStub);
         sinon.assert.calledOnce(commitSpy);
         isOccStub.restore();
     });
 
-    it('Test Commit with OccConflict', async function() {
-        mockCommunicator.commit = async function () {throw new Error(mockMessage);};
-        let isOccStub = sandbox.stub(Errors, "isOccConflictException");
+    it("Test commit with isOccConflictException as true", async () => {
+        mockCommunicator.commit = async () => {
+            throw new Error(testMessage);
+        };
+        const isOccStub = sandbox.stub(Errors, "isOccConflictException");
         isOccStub.returns(true);
-        let commitSpy = sandbox.spy(mockCommunicator, "commit");
+        const commitSpy = sandbox.spy(mockCommunicator, "commit");
         await chai.expect(transaction.commit()).to.be.rejected;
         sinon.assert.calledOnce(commitSpy);
         sinon.assert.calledOnce(isOccStub);
         isOccStub.restore();
     });
 
-    it('Test Commit with Non-OccConflict', async function() {
-        mockCommunicator.commit = async function () {throw new Error(mockMessage);};
-        let isOccStub = sandbox.stub(Errors, "isOccConflictException");
+    it("Test commit with isOccConflictException as false", async () => {
+        mockCommunicator.commit = async () => {
+            throw new Error(testMessage);
+        };
+        const isOccStub = sandbox.stub(Errors, "isOccConflictException");
         isOccStub.returns(false);
-        let commitSpy = sandbox.spy(mockCommunicator, "commit");
-        let abortSpy = sandbox.spy(mockCommunicator, "abort");
+        const commitSpy = sandbox.spy(mockCommunicator, "commit");
+        const abortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
         await chai.expect(transaction.commit()).to.be.rejected;
         sinon.assert.calledOnce(commitSpy);
         sinon.assert.calledOnce(abortSpy);
@@ -119,14 +184,18 @@ describe('Transaction test', function() {
         isOccStub.restore();
     });
 
-    it('Test Commit with Non-OccConflict and Abort Throws Error', async function() {
-        mockCommunicator.commit = async function () {throw new Error("mockMessage");};
-        mockCommunicator.abortTransaction = async function () {throw new Error("foo2");};
-        let isOccStub = sandbox.stub(Errors, "isOccConflictException");
-        let logSpy = sandbox.spy(logUtil, "warn");
+    it("Test commit with non-OccConflictException exception and abortTransaction throws error", async () => {
+        mockCommunicator.commit = async () => {
+            throw new Error("mockMessage");
+        };
+        mockCommunicator.abortTransaction = async () => {
+            throw new Error("foo2");
+        };
+        const isOccStub = sandbox.stub(Errors, "isOccConflictException");
+        const logSpy = sandbox.spy(logUtil, "warn");
         isOccStub.returns(false);
-        let commitSpy = sandbox.spy(mockCommunicator, "commit");
-        let abortSpy = sandbox.spy(mockCommunicator, "abort");
+        const commitSpy = sandbox.spy(mockCommunicator, "commit");
+        const abortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
         await chai.expect(transaction.commit()).to.be.rejected;
         sinon.assert.calledOnce(commitSpy);
         sinon.assert.calledOnce(abortSpy);
@@ -135,212 +204,251 @@ describe('Transaction test', function() {
         isOccStub.restore();
     });
 
-    it('Test Execute Inline with No Parameters', async function() {
-        Result.create = async function() {return mockResult};
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let result: Result = await transaction.executeInline(mockStatement);
+    it("Test executeInline with no parameters", async () => {
+        Result.create = async () => {
+            return mockResult
+        };
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const result: Result = await transaction.executeInline(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, undefined);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, []);
         chai.assert.equal(result, mockResult);
     });
 
-    it('Test Execute Inline with Parameters', async function() {
-        Result.create = async function() {return mockResult};
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage);
-        let writer2 = transaction.registerParameter(2);
-        writer2.writeString(mockMessage2);
-        let result: Result = await transaction.executeInline(mockStatement);
+    it("Test executeInline with parameters", async () => {
+        Result.create = async () => {
+            return mockResult
+        };
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage);
+        const writer2: Writer = transaction.registerParameter(2);
+        writer2.writeString(testMessage2);
+        const result: Result = await transaction.executeInline(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, [writer1, writer2]);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, [writer1, writer2]);
         chai.assert.equal(result, mockResult);
     });
 
-    it('Test Execute Inline with Updated Parameter', async function() {
-        Result.create = async function() {return mockResult};
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage);
-        let updatedWriter1 = transaction.registerParameter(1);
-        updatedWriter1.writeString(mockMessage2);
-        let result: Result = await transaction.executeInline(mockStatement);
+    it("Test executeInline with updated parameter", async () => {
+        Result.create = async () => {
+            return mockResult
+        };
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage);
+        const updatedWriter1: Writer = transaction.registerParameter(1);
+        updatedWriter1.writeString(testMessage2);
+        const result: Result = await transaction.executeInline(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, [updatedWriter1]);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, [updatedWriter1]);
         chai.assert.equal(result, mockResult);
     });
 
-    it('Test Execute Inline with Non-Sequential Parameter Registration', async function() {
-        Result.create = async function() {return mockResult};
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let writer2 = transaction.registerParameter(2);
-        writer2.writeString(mockMessage);
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage2);
-        let result: Result = await transaction.executeInline(mockStatement);
+    it("Test executeInline with non-sequential parameter registration", async () => {
+        Result.create = async () => {
+            return mockResult
+        };
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const writer2: Writer = transaction.registerParameter(2);
+        writer2.writeString(testMessage);
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage2);
+        const result: Result = await transaction.executeInline(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, [writer1, writer2]);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, [writer1, writer2]);
         chai.assert.equal(result, mockResult);
     });
 
-    it('Test Execute Inline with Missing Parameters', async function() {
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage);
-        let writer3 = transaction.registerParameter(3);
-        writer3.writeString(mockMessage2);
-        await chai.expect(transaction.executeInline(mockStatement)).to.be.rejected;
+    it("Test executeInline with missing parameters", async () => {
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage);
+        const writer3: Writer = transaction.registerParameter(3);
+        writer3.writeString(testMessage2);
+        await chai.expect(transaction.executeInline(testStatement)).to.be.rejected;
     });
 
-    it('Test Execute Inline with Exception', async function() {
-        mockCommunicator.executeStatement = async function () {throw new Error(mockMessage);};
-        let isOccStub = sandbox.stub(Errors, "isOccConflictException");
+    it("Test executeInline with exception", async () => {
+        mockCommunicator.executeStatement = async () => {
+            throw new Error(testMessage);
+        };
+        const isOccStub = sandbox.stub(Errors, "isOccConflictException");
         isOccStub.returns(false);
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        await chai.expect(transaction.executeInline(mockStatement)).to.be.rejected;
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        await chai.expect(transaction.executeInline(testStatement)).to.be.rejected;
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, undefined);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, []);
         isOccStub.restore();
     });
 
-    it('Test Execute Stream with No Parameters', async function() {
-        let sampleResultStreamObject = new ResultStream(mockTransactionId, pageToken, mockCommunicator);
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let result: ResultStream = await transaction.executeStream(mockStatement);
+    it("Test executeInline twice", async () => {
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        await transaction.executeInline(testStatement);
+        await transaction.executeInline(testStatement);
+        sinon.assert.calledTwice(executeSpy);
+    });
+
+    it("Test executeStream with no parameters", async () => {
+        const sampleResultStreamObject: ResultStream = new ResultStream(testTransactionId, pageToken, mockCommunicator);
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const result: ResultStream = await transaction.executeStream(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, undefined);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, []);
         chai.assert.equal(JSON.stringify(result), JSON.stringify(sampleResultStreamObject));
     });
 
-    it('Test Execute Stream with Parameters', async function() {
-        let sampleResultStreamObject = new ResultStream(mockTransactionId, pageToken, mockCommunicator);
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage);
-        let writer2 = transaction.registerParameter(2);
-        writer2.writeString(mockMessage2);
-        let result: ResultStream = await transaction.executeStream(mockStatement);
+    it("Test executeStream with parameters", async () => {
+        const sampleResultStreamObject: ResultStream = new ResultStream(testTransactionId, pageToken, mockCommunicator);
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage);
+        const writer2: Writer = transaction.registerParameter(2);
+        writer2.writeString(testMessage2);
+        const result: ResultStream = await transaction.executeStream(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, [writer1, writer2]);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, [writer1, writer2]);
         chai.assert.equal(JSON.stringify(result), JSON.stringify(sampleResultStreamObject));
     });
 
-    it('Test Execute Stream with Updated Parameter', async function() {
-        let sampleResultStreamObject = new ResultStream(mockTransactionId, pageToken, mockCommunicator);
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage);
-        let updatedWriter1 = transaction.registerParameter(1);
-        updatedWriter1.writeString(mockMessage2);
-        let result: ResultStream = await transaction.executeStream(mockStatement);
+    it("Test executeStream with updated parameter", async () => {
+        const sampleResultStreamObject: ResultStream = new ResultStream(testTransactionId, pageToken, mockCommunicator);
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage);
+        const updatedWriter1: Writer = transaction.registerParameter(1);
+        updatedWriter1.writeString(testMessage2);
+        const result: ResultStream = await transaction.executeStream(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, [updatedWriter1]);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, [updatedWriter1]);
         chai.assert.equal(JSON.stringify(result), JSON.stringify(sampleResultStreamObject));
     });
 
-    it('Test Execute Stream with Non-Sequential Parameter Registration', async function() {
-        let sampleResultStreamObject = new ResultStream(mockTransactionId, pageToken, mockCommunicator);
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        let writer2 = transaction.registerParameter(2);
-        writer2.writeString(mockMessage);
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage2);
-        let result: ResultStream = await transaction.executeStream(mockStatement);
+    it("Test executeStream with non-sequential parameter registration", async () => {
+        const sampleResultStreamObject: ResultStream = new ResultStream(testTransactionId, pageToken, mockCommunicator);
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        const writer2: Writer = transaction.registerParameter(2);
+        writer2.writeString(testMessage);
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage2);
+        const result: ResultStream = await transaction.executeStream(testStatement);
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, [writer1, writer2]);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, [writer1, writer2]);
         chai.assert.equal(JSON.stringify(result), JSON.stringify(sampleResultStreamObject));
     });
 
-    it('Test Execute Stream with Missing Parameters', async function() {
-        let writer1 = transaction.registerParameter(1);
-        writer1.writeString(mockMessage);
-        let writer3 = transaction.registerParameter(3);
-        writer3.writeString(mockMessage2);
-        await chai.expect(transaction.executeStream(mockStatement)).to.be.rejected;
+    it("Test executeStream with missing parameters", async () => {
+        const writer1: Writer = transaction.registerParameter(1);
+        writer1.writeString(testMessage);
+        const writer3: Writer = transaction.registerParameter(3);
+        writer3.writeString(testMessage2);
+        await chai.expect(transaction.executeStream(testStatement)).to.be.rejected;
     });
 
-    it('Test Execute Stream with Exception', async function() {
-        mockCommunicator.executeStatement = async function () {throw new Error(mockMessage);};
-        let isOccStub = sandbox.stub(Errors, "isOccConflictException");
+    it("Test executeStream with exception", async () => {
+        mockCommunicator.executeStatement = async () => {
+            throw new Error(testMessage);
+        };
+        const isOccStub = sandbox.stub(Errors, "isOccConflictException");
         isOccStub.returns(false);
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        await chai.expect(transaction.executeStream(mockStatement)).to.be.rejected;
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        await chai.expect(transaction.executeStream(testStatement)).to.be.rejected;
         sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, mockStatement, mockTransactionId, undefined);
+        sinon.assert.calledWith(executeSpy, testTransactionId, testStatement, []);
         isOccStub.restore();
     });
 
-    it('Test Registering Invalid Parameter Number Zero', function() {
-        chai.expect(function() {
+    it("Test executeStream twice", async () => {
+        const executeSpy = sandbox.spy(mockCommunicator, "executeStatement");
+        await transaction.executeStream(testStatement);
+        await transaction.executeStream(testStatement);
+        sinon.assert.calledTwice(executeSpy);
+    });
+
+    it("Test getTransactionId", () => {
+        const transactionIdSpy = sandbox.spy(transaction, "getTransactionId");
+        const transactionId: string = transaction.getTransactionId();
+        chai.assert.equal(transactionId, testTransactionId);
+        sinon.assert.calledOnce(transactionIdSpy);
+    });
+
+    it("Test registering invalid parameter number zero", () => {
+        chai.expect(() => {
             transaction.registerParameter(0);
         }).to.throw();
     });
 
-    it('Test Registering Negative Parameter Number', function() {
-        chai.expect(function() {
+    it("Test registering negative parameter number", () => {
+        chai.expect(() => {
             transaction.registerParameter(-1);
         }).to.throw();
     });
 
-    it('Test FindMissingParams with No Missing Parameters', function() {
+    it("Test _findMissingParams with no missing parameters", () => {
         transaction.registerParameter(1);
         transaction.registerParameter(2);
-        let findMissingParams = transaction["_findMissingParams"];
-        let missingParamList = findMissingParams();
+        const missingParamList: string = transaction["_findMissingParams"]();
         chai.assert.equal(missingParamList, "");
     });
 
-    it('Test FindMissingParams with Missing Parameters', function() {
+    it("Test _findMissingParams with missing parameters", () => {
         transaction.registerParameter(1);
         transaction.registerParameter(5);
-        let findMissingParams = transaction["_findMissingParams"];
-        let missingParamList = findMissingParams();
+        const missingParamList: string = transaction["_findMissingParams"]();
         chai.assert.equal(missingParamList, "2, 3, 4");
     });
 
-    it('Test Abort after Commit', async function() {
-        let abortSpy = sandbox.spy(mockCommunicator, "abort");
+    it("Test _internalClose", async () => {
+        const sampleResultStreamObject: ResultStream = new ResultStream(testTransactionId, pageToken, mockCommunicator);
+        const sampleResultStreamObject2: ResultStream = new ResultStream(testTransactionId, pageToken, mockCommunicator);
+        transaction["_resultStreams"] = [sampleResultStreamObject, sampleResultStreamObject2];
+        transaction["_internalClose"]();
+        chai.expect(transaction["_isClosed"]).to.be.true;
+        chai.assert.equal(transaction["_resultStreams"].length, 0);
+        chai.assert.equal(sampleResultStreamObject["_isClosed"], true);
+        chai.assert.equal(sampleResultStreamObject2["_isClosed"], true);
+    });
+
+    it("Test _sendExecute after commit", async () => {
         await transaction.commit();
-        // This should be a no-op.
-        await transaction.abort();
-        sinon.assert.notCalled(abortSpy);
+        await chai.expect(transaction["_sendExecute"](testStatement)).to.be.rejected;
     });
 
-    it('Test Commit after Commit', async function() {
-        let commitSpy = sandbox.spy(mockCommunicator, "commit");
-        await transaction.commit();
-        await chai.expect(transaction.commit()).to.be.rejected;
-        sinon.assert.calledOnce(commitSpy);
+    it("Test _sendExecute when closed", async () => {
+        transaction["_isClosed"] = true;
+        await chai.expect(transaction["_sendExecute"](testStatement)).to.be.rejected;
     });
 
-    it('Test Execute Inline after Commit', async function() {
-        await transaction.commit();
-        await chai.expect(transaction.executeInline(mockStatement)).to.be.rejected;
+    it("Test _updateHash", async () => {
+        const updatedHash: Uint8Array = transaction["_txnHash"].dot(QldbHash.toQldbHash(testStatement)).getQldbHash();
+
+        const toQldbHashSpy = sandbox.spy(QldbHash, "toQldbHash");
+        transaction["_updateHash"](testStatement, []);
+        sinon.assert.calledOnce(toQldbHashSpy);
+        sinon.assert.calledWith(toQldbHashSpy, testStatement);
+
+        chai.assert.equal(toBase64(transaction["_txnHash"].getQldbHash()), toBase64(updatedHash));
+        toQldbHashSpy.restore();
     });
 
-    it('Test Execute Stream after Commit', async function() {
-        await transaction.commit();
-        await chai.expect(transaction.executeStream(mockStatement)).to.be.rejected;
-    });
+    it("Test _updateHash with parameters", async () => {
+        const parameter1: Writer = transaction.registerParameter(1);
+        const parameter2: Writer = transaction.registerParameter(2);
+        const parameters: Writer[] = [parameter1, parameter2];
 
-    it('Test Execute Inline Twice', async function() {
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        await transaction.executeInline(mockStatement);
-        await transaction.executeInline(mockStatement);
-        sinon.assert.calledTwice(executeSpy);
-    });
+        let testStatementHash: QldbHash = QldbHash.toQldbHash(testStatement);
+        parameters.forEach((writer: Writer) => {
+            testStatementHash = testStatementHash.dot(QldbHash.toQldbHash(writer.getBytes()));
+        });
+        const updatedHash: Uint8Array = transaction["_txnHash"].dot(testStatementHash).getQldbHash();
 
-    it('Test Execute Stream Twice', async function() {
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        await transaction.executeStream(mockStatement);
-        await transaction.executeStream(mockStatement);
-        sinon.assert.calledTwice(executeSpy);
-    });
+        const toQldbHashSpy = sandbox.spy(QldbHash, "toQldbHash");
+        transaction["_updateHash"](testStatement, parameters);
+        sinon.assert.calledThrice(toQldbHashSpy);
+        sinon.assert.calledWith(toQldbHashSpy, testStatement);
+        sinon.assert.calledWith(toQldbHashSpy, parameter1.getBytes());
+        sinon.assert.calledWith(toQldbHashSpy, parameter2.getBytes());
 
-    it('Test Execute Inline, Commit, Execute Stream', async function() {
-        let executeSpy = sandbox.spy(mockCommunicator, "execute");
-        await transaction.executeInline(mockStatement);
-        await transaction.commit();
-        await chai.expect(transaction.executeStream(mockStatement)).to.be.rejected;
-        sinon.assert.calledOnce(executeSpy);
+        chai.assert.equal(toBase64(transaction["_txnHash"].getQldbHash()), toBase64(updatedHash));
+        toQldbHashSpy.restore();
     });
-})
+});

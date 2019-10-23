@@ -12,239 +12,273 @@
  */
 
 import { QLDBSession } from "aws-sdk";
-import { 
+import {
     ClientConfiguration,
-    ExecuteStatementResult, 
-    Page, 
+    CommitTransactionResult,
+    ExecuteStatementResult,
+    Page,
     PageToken,
-    SendCommandRequest, 
-    SendCommandResult
+    SendCommandRequest,
+    SendCommandResult,
+    ValueHolder
 } from "aws-sdk/clients/qldbsession";
+import * as chai from "chai";
+import * as chaiAsPromised from "chai-as-promised";
 import { IonTypes, makeBinaryWriter, Writer } from "ion-js";
+import * as sinon from "sinon";
 
-import * as Errors from "../errors/Errors";
 import { Communicator } from "../Communicator";
 import * as logUtil from "../logUtil";
 
-const chai = require("chai");
-const chaiAsPromised = require("chai-as-promised");
 chai.use(chaiAsPromised);
-const sinon = require("sinon");
 const sandbox = sinon.createSandbox();
 
-let mockLedgerName: string = "fakeLedgerName";
-let mockMessage: string = "foo";
-let mockPageToken: PageToken = "pageToken";
-let mockWriter: Writer = makeBinaryWriter();
-let mockParameters: Writer[] = [mockWriter];
-let mockStatement: string = "SELECT * FROM foo";
-let mockTransactionId: string = "txnId";
+const testLedgerName: string = "fakeLedgerName";
+const testMessage: string = "foo";
+const testPageToken: PageToken = "pageToken";
+const testSessionToken: string = "sessionToken";
+const testWriter: Writer = makeBinaryWriter();
+const testParameters: Writer[] = [testWriter];
+const testStatement: string = "SELECT * FROM foo";
+const testTransactionId: string = "txnId";
+const testHashToQldb: Uint8Array = new Uint8Array([1, 2, 3]);
+const testHashFromQldb: Uint8Array = new Uint8Array([4, 5, 6]);
+const testLowLevelClientOptions: ClientConfiguration = {
+    region: "fakeRegion"
+};
 
-describe('Communicator test', function() {
-    let communicator: Communicator;
-    let mockSessionToken: string = "sessionToken";
-    let mockLowLevelClientOptions: ClientConfiguration = {
-        region: "fakeRegion"
-    };
-    let mockPage: Page = {};
-    let mockExecuteStatementResult: ExecuteStatementResult = {FirstPage: mockPage};
-    let mockQldbLowLevelClient: QLDBSession;
-    let mockSendCommandResult: SendCommandResult = {StartSession: {SessionToken: mockSessionToken},
-                                                    StartTransaction: {TransactionId: mockTransactionId}, 
-                                                    FetchPage: {Page: mockPage}, 
-                                                    ExecuteStatement: mockExecuteStatementResult};
-    let sendCommandStub;
+const testPage: Page = {};
+const testExecuteStatementResult: ExecuteStatementResult = {
+    FirstPage: testPage
+};
+const testCommitTransactionResult: CommitTransactionResult = {
+    TransactionId: testTransactionId,
+    CommitDigest: testHashFromQldb
+};
+const testSendCommandResult: SendCommandResult = {
+    StartSession: {
+        SessionToken: testSessionToken
+    },
+    StartTransaction: {
+        TransactionId: testTransactionId
+    },
+    FetchPage: {
+        Page: testPage
+    },
+    ExecuteStatement: testExecuteStatementResult,
+    CommitTransaction: testCommitTransactionResult
+};
 
-    beforeEach(async function () {
-        mockQldbLowLevelClient = new QLDBSession(mockLowLevelClientOptions);
-        sendCommandStub = sandbox.stub(mockQldbLowLevelClient, "sendCommand");
-        sendCommandStub.returns({promise: () => {return mockSendCommandResult}});
-        communicator = await Communicator.create(mockQldbLowLevelClient, mockLedgerName);
+let sendCommandStub: sinon.SinonStub;
+let testQldbLowLevelClient: QLDBSession;
+let communicator: Communicator;
+
+describe("Communicator test", () => {
+
+    beforeEach(async () => {
+        testQldbLowLevelClient = new QLDBSession(testLowLevelClientOptions);
+        sendCommandStub = sandbox.stub(testQldbLowLevelClient, "sendCommand");
+        sendCommandStub.returns({
+            promise: () => {
+                return testSendCommandResult;
+            }
+        });
+        communicator = await Communicator.create(testQldbLowLevelClient, testLedgerName);
     });
 
-    afterEach(function () {
-        sendCommandStub.restore();
-    });
-
-    after(function () {
+    afterEach(() => {
         sandbox.restore();
     });
 
-    it('Test Start Transaction', async function() {
-        let txnId: string = await communicator.startTransaction();
-        let mockRequest: SendCommandRequest = {
-            SessionToken: mockSessionToken,
-            StartTransaction: {}
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
-        chai.assert.equal(txnId, mockTransactionId);
-    });
-
-    it('Test Abort', async function() {
+    it("Test abortTransaction", async () => {
         await communicator.abortTransaction();
-        let mockRequest: SendCommandRequest = {
-            SessionToken: mockSessionToken,
+        const testRequest: SendCommandRequest = {
+            SessionToken: testSessionToken,
             AbortTransaction: {}
         };
         sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
     });
 
-    it('Test Commit', async function() {
-        //TODO: Commit digest hash.
-        await communicator.commit(mockTransactionId, undefined);
-        let mockRequest: SendCommandRequest = {
-            SessionToken: mockSessionToken,
+    it("Test commit", async () => {
+        const commitResult: CommitTransactionResult = await communicator.commit(testTransactionId, testHashToQldb);
+        const testRequest: SendCommandRequest = {
+            SessionToken: testSessionToken,
             CommitTransaction: {
-              TransactionId: mockTransactionId,
-              CommitDigest: undefined
+                TransactionId: testTransactionId,
+                CommitDigest: testHashToQldb
             }
         };
         sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
+        chai.assert.equal(commitResult, testSendCommandResult.CommitTransaction);
     });
 
-    it('Test Close', async function() {
-        await communicator.endSession();
-        let mockRequest = {
-            EndSession: {}
+    it("Test executeStatement with no parameters", async () => {
+        const result: ExecuteStatementResult = await communicator.executeStatement(
+            testTransactionId,
+            testStatement,
+            []
+        );
+        const testRequest: SendCommandRequest = {
+            SessionToken: testSessionToken,
+            ExecuteStatement: {
+                Statement: testStatement,
+                TransactionId: testTransactionId,
+                Parameters: []
+            }
         };
         sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
+        chai.assert.equal(result, testExecuteStatementResult);
     });
 
-    it('Test Close With Exception', async function() {
-        sendCommandStub.returns({promise: () => {throw new Error(mockMessage)}});
-        let logSpy = sandbox.spy(logUtil, "warn");
-        await communicator.endSession();
-        let mockRequest = {
-            EndSession: {}
+    it("Test executeStatement with parameters", async () => {
+        const result: ExecuteStatementResult = await communicator.executeStatement(testTransactionId, testStatement,
+            testParameters);
+        const ionToValueHolder = communicator["_ionToValueHolder"];
+        const sentParameters: ValueHolder[] = ionToValueHolder(testParameters);
+        const testRequest: SendCommandRequest = {
+            SessionToken: testSessionToken,
+            ExecuteStatement: {
+                Statement: testStatement,
+                TransactionId: testTransactionId,
+                Parameters: sentParameters
+            }
         };
         sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
+        chai.assert.equal(result, testExecuteStatementResult);
+    });
+
+    it("Test executeStatement with exception", async () => {
+        sendCommandStub.returns({
+            promise: () => {
+                throw new Error(testMessage);
+            }
+        });
+        const testRequest: SendCommandRequest = {
+            SessionToken: testSessionToken,
+            ExecuteStatement: {
+                Statement: testStatement,
+                TransactionId: testTransactionId,
+                Parameters: []
+            }
+        };
+        await chai.expect(communicator.executeStatement(testTransactionId, testStatement, [])).to.be.rejected;
+        sinon.assert.calledTwice(sendCommandStub);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
+    });
+
+    it("Test endSession", async () => {
+        await communicator.endSession();
+        const testRequest: SendCommandRequest = {
+            EndSession: {},
+            SessionToken: testSessionToken
+        };
+        sinon.assert.calledTwice(sendCommandStub);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
+    });
+
+    it("Test endSession with exception", async () => {
+        sendCommandStub.returns({
+            promise: () => {
+                throw new Error(testMessage);
+            }
+        });
+        const logSpy = sandbox.spy(logUtil, "warn");
+        await communicator.endSession();
+        const testRequest: SendCommandRequest = {
+            EndSession: {},
+            SessionToken: testSessionToken
+        };
+        sinon.assert.calledTwice(sendCommandStub);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
         sinon.assert.calledOnce(logSpy);
     });
 
-    it('Test Fetch Result', async function() {
-        let page: Page = await communicator.fetchPage(mockTransactionId, mockPageToken);
-        let mockRequest: SendCommandRequest = {
-            SessionToken: mockSessionToken,
+    it("Test fetchPage", async () => {
+        const page: Page = await communicator.fetchPage(testTransactionId, testPageToken);
+        const testRequest: SendCommandRequest = {
+            SessionToken: testSessionToken,
             FetchPage: {
-              TransactionId: mockTransactionId,
-              NextPageToken: mockPageToken
+                TransactionId: testTransactionId,
+                NextPageToken: testPageToken
             }
         };
         sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
-        chai.assert.equal(page, mockPage);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
+        chai.assert.equal(page, testPage);
     });
 
-    it('Test Send Command', async function() {
-        let mockSendCommandRequest: SendCommandRequest = {};
-        let sendCommand = communicator["_sendCommand"];
-        let result: SendCommandResult = await sendCommand(mockSendCommandRequest);
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockSendCommandRequest);
-        chai.assert.equal(result, mockSendCommandResult);
+    it("Test getLedgerName", () => {
+        const ledgerName: string = communicator.getLedgerName();
+        chai.assert.equal(ledgerName, testLedgerName);
     });
 
-    it('Test Send Command With InvalidSessionException', async function() {
-        let isInvalidSessionStub = sandbox.stub(Errors, "isInvalidSessionException");
-        isInvalidSessionStub.returns(true);
-        sendCommandStub.returns({promise: () => {throw new Error(mockMessage)}});
-        let mockSendCommandRequest: SendCommandRequest = {};
-        let sendCommand = communicator["_sendCommand"];
-        await chai.expect(sendCommand(mockSendCommandRequest)).to.be.rejected;
-        isInvalidSessionStub.restore();
+    it("Test getLowLevelClient", () => {
+        const lowLevelClient: QLDBSession = communicator.getLowLevelClient();
+        chai.assert.equal(lowLevelClient, testQldbLowLevelClient);
     });
 
-    it('Test Send Command With Exception Not InvalidSessionException', async function() {
-        let isInvalidSessionStub = sandbox.stub(Errors, "isInvalidSessionException");
-        isInvalidSessionStub.returns(false);
-        sendCommandStub.returns({promise: () => {throw new Error(mockMessage)}});
-        let mockSendCommandRequest: SendCommandRequest = {};
-        let sendCommand = communicator["_sendCommand"];
-        await chai.expect(sendCommand(mockSendCommandRequest)).to.be.rejected;
-        isInvalidSessionStub.restore();
+    it("Test getSessionToken", () => {
+        const sessionToken: string = communicator.getSessionToken();
+        chai.assert.equal(sessionToken, testSessionToken);
     });
 
-    it('Test Execute', async function() {
-        let result: ExecuteStatementResult = await communicator.executeStatement(mockTransactionId, mockStatement, 
-            undefined);
-        let mockRequest: SendCommandRequest = {
-            SessionToken: mockSessionToken,
-            ExecuteStatement: {
-              Statement: mockStatement,
-              TransactionId: mockTransactionId, 
-              Parameters: []
-            }
+    it("Test startTransaction", async () => {
+        const txnId: string = await communicator.startTransaction();
+        const testRequest: SendCommandRequest = {
+            SessionToken: testSessionToken,
+            StartTransaction: {}
         };
         sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
-        chai.assert.equal(result, mockExecuteStatementResult);
+        sinon.assert.calledWith(sendCommandStub, testRequest);
+        chai.assert.equal(txnId, testTransactionId);
     });
 
-    it('Test Execute with Parameters', async function() {
-        let result: ExecuteStatementResult = await communicator.executeStatement(mockStatement, mockTransactionId, 
-            mockParameters);
-        let ionToValueHolder = communicator["_ionToValueHolder"];
-        let sentParameters = ionToValueHolder(mockParameters);
-        let mockRequest: SendCommandRequest = {
-            SessionToken: mockSessionToken,
-            ExecuteStatement: {
-              Statement: mockStatement,
-              TransactionId: mockTransactionId, 
-              Parameters: sentParameters
-            }
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
-        chai.assert.equal(result, mockExecuteStatementResult);
-    });
-
-    it('Test Execute Raises Exception', async function() {
-        sendCommandStub.returns({promise: () => {throw new Error(mockMessage)}});
-        let mockRequest: SendCommandRequest = {
-            SessionToken: mockSessionToken,
-            ExecuteStatement: {
-              Statement: mockStatement,
-              TransactionId: mockTransactionId, 
-              Parameters: []
-            }
-        };
-        await chai.expect(communicator.executeStatement(mockStatement, mockTransactionId, undefined)).to.be.rejected;
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockRequest);
-    });
-
-    it('Test Get Session Token', function() {
-        let sessionToken: string = communicator.getSessionToken()
-        chai.assert.equal(sessionToken, mockSessionToken);
-    });
-
-    it('Test Get LowLevelClient', function() {
-        let lowLevelClient: QLDBSession = communicator.getLowLevelClient();
-        chai.assert.equal(lowLevelClient, mockQldbLowLevelClient);
-    });
-
-    it('Test IonToValueHolder Method', function() {
-        let ionWriter: Writer = makeBinaryWriter();
-        let communicatorIonWriter: Writer = makeBinaryWriter();
-        let object = [{PersonId: "123"}];
+    it("Test _ionToValueHolder", () => {
+        const ionWriter: Writer = makeBinaryWriter();
+        const communicatorIonWriter: Writer = makeBinaryWriter();
+        const object = [{
+            PersonId: "123"
+        }];
         ionWriter.stepIn(IonTypes.STRUCT);
+
         for (const key of Object.keys(object)) {
             ionWriter.writeFieldName(key);
             ionWriter.writeString(object[key]);
         }
-        communicatorIonWriter.stepIn(IonTypes.STRUCT)
+        communicatorIonWriter.stepIn(IonTypes.STRUCT);
+
         for (const key of Object.keys(object)) {
             communicatorIonWriter.writeFieldName(key);
             communicatorIonWriter.writeString(object[key]);
         }
-        let valueHolder = [{IonBinary: ionWriter.getBytes()}];
-        let ionToValueHolder = communicator["_ionToValueHolder"];
-        let communicatorValueHolder = ionToValueHolder([communicatorIonWriter]);
+        const valueHolder = [{
+            IonBinary: ionWriter.getBytes()
+        }];
+        const ionToValueHolder = communicator["_ionToValueHolder"];
+        const communicatorValueHolder: ValueHolder[] = ionToValueHolder([communicatorIonWriter]);
         chai.assert.equal(JSON.stringify(valueHolder), JSON.stringify(communicatorValueHolder));
     });
-})
+
+    it("Test _sendCommand", async () => {
+        const mockSendCommandRequest: SendCommandRequest = {};
+        const result: SendCommandResult = await communicator["_sendCommand"](mockSendCommandRequest);
+        sinon.assert.calledTwice(sendCommandStub);
+        sinon.assert.calledWith(sendCommandStub, mockSendCommandRequest);
+        chai.assert.equal(result, testSendCommandResult);
+    });
+
+    it("Test _sendCommand with exception", async () => {
+        sendCommandStub.returns({
+            promise: () => {
+                throw new Error(testMessage);
+            }
+        });
+        const mockSendCommandRequest: SendCommandRequest = {};
+        const sendCommand = communicator["_sendCommand"];
+        await chai.expect(sendCommand(mockSendCommandRequest)).to.be.rejected;
+    });
+});

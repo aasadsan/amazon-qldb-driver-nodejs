@@ -29,29 +29,29 @@ import { ResultStream } from "./ResultStream";
 import { Transaction } from "./Transaction";
 import { TransactionExecutor } from "./TransactionExecutor";
 
-let SLEEP_CAP_MS: number = 5000;
-let SLEEP_BASE_MS: number = 10;
+const SLEEP_CAP_MS: number = 5000;
+const SLEEP_BASE_MS: number = 10;
 
 /**
  * Represents a session to a specific ledger within QLDB, allowing for execution of PartiQL statements and
  * retrieval of the associated results, along with control over transactions for bundling multiple executions.
  *
- * The execute methods provided will automatically retry themselves in the case that an unexpected recoverable error 
- * occurs, including OCC conflicts, by starting a brand new transaction and re-executing the statement within the new 
+ * The execute methods provided will automatically retry themselves in the case that an unexpected recoverable error
+ * occurs, including OCC conflicts, by starting a brand new transaction and re-executing the statement within the new
  * transaction.
- * 
- * There are three methods of execution, ranging from simple to complex; the first two are recommended for inbuilt 
+ *
+ * There are three methods of execution, ranging from simple to complex; the first two are recommended for inbuilt
  * error handling:
- *  - {@linkcode QldbSessionImpl.executeStatement} allows for a single statement to be executed within a transaction 
+ *  - {@linkcode QldbSessionImpl.executeStatement} allows for a single statement to be executed within a transaction
  *    where the transaction is implicitly created and committed, and any recoverable errors are transparently handled.
- *  - {@linkcode QldbSessionImpl.executeLambda} allow for more complex execution sequences where more than one 
- *    execution can occur, as well as other method calls. The transaction is implicitly created and committed, and any 
+ *  - {@linkcode QldbSessionImpl.executeLambda} allow for more complex execution sequences where more than one
+ *    execution can occur, as well as other method calls. The transaction is implicitly created and committed, and any
  *    recoverable errors are transparently handled.
- *  - {@linkcode QldbSessionImpl.startTransaction} allows for full control over when the transaction is committed and 
- *    leaves the responsibility of OCC conflict handling up to the user. Transactions' methods cannot be automatically 
+ *  - {@linkcode QldbSessionImpl.startTransaction} allows for full control over when the transaction is committed and
+ *    leaves the responsibility of OCC conflict handling up to the user. Transactions' methods cannot be automatically
  *    retried, as the state of the transaction is ambiguous in the case of an unexpected error.
  */
-export class QldbSessionImpl implements QldbSession{
+export class QldbSessionImpl implements QldbSession {
     private _communicator: Communicator;
     private _retryLimit: number;
     private _isClosed: boolean;
@@ -70,24 +70,24 @@ export class QldbSessionImpl implements QldbSession{
     /**
      * Close this session. No-op if already closed.
      */
-    async close() {
+    close(): void {
         if (this._isClosed) {
             return;
         }
         this._isClosed = true;
-        await this._communicator.endSession();
+        this._communicator.endSession();
     }
 
     /**
      * Implicitly start a transaction, execute the lambda, and commit the transaction, retrying up to the
      * retry limit if an OCC conflict or retriable exception occurs.
-     * 
-     * @param queryLambda A lambda representing the block of code to be executed within the transaction. This cannot 
-     *                    have any side effects as it may be invoked multiple times, and the result cannot be trusted 
+     *
+     * @param queryLambda A lambda representing the block of code to be executed within the transaction. This cannot
+     *                    have any side effects as it may be invoked multiple times, and the result cannot be trusted
      *                    until the transaction is committed.
-     * @param retryIndicator An optional lambda that is invoked when the `querylambda` is about to be retried due to an 
+     * @param retryIndicator An optional lambda that is invoked when the `querylambda` is about to be retried due to an
      *                       OCC conflict or retriable exception.
-     * @returns Promise which fulfills with the return value of the `queryLambda` which could be a {@linkcode Result} 
+     * @returns Promise which fulfills with the return value of the `queryLambda` which could be a {@linkcode Result}
      *          on the result set of a statement within the lambda.
      * @throws {@linkcode SessionClosedError} when this session is closed.
      */
@@ -102,7 +102,7 @@ export class QldbSessionImpl implements QldbSession{
             try {
                 transaction = null;
                 transaction = await this.startTransaction();
-                let transactionExecutor = new TransactionExecutor(transaction);
+                const transactionExecutor = new TransactionExecutor(transaction);
                 let returnedValue: any = await queryLambda(transactionExecutor);
                 if (returnedValue instanceof ResultStream) {
                     returnedValue = await Result.bufferResultStream(returnedValue);
@@ -115,9 +115,9 @@ export class QldbSessionImpl implements QldbSession{
                     throw e;
                 }
                 if (isOccConflictException(e) || isRetriableException(e) || isInvalidSessionException(e)) {
-                    warn("OCC conflict or retriable exception occurred: " + e);
+                    warn(`OCC conflict or retriable exception occurred: ${e}.`);
                     if (isInvalidSessionException(e)) {
-                        info("Creating a new session to QLDB; previous session is no longer valid: " + e);
+                        info(`Creating a new session to QLDB; previous session is no longer valid: ${e}.`);
                         this._communicator = await Communicator.create(
                             this._communicator.getLowLevelClient(),
                             this._communicator.getLedgerName()
@@ -139,9 +139,9 @@ export class QldbSessionImpl implements QldbSession{
     /**
      * Implicitly start a transaction, execute the statement, and commit the transaction, retrying up to the
      * retry limit if an OCC conflict or retriable exception occurs.
-     * 
+     *
      * @param statement The statement to execute.
-     * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an 
+     * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an
      *                       OCC conflict or retriable exception.
      * @returns Promise which fulfills with a Result.
      * @throws {@linkcode SessionClosedError} when this session is closed.
@@ -173,9 +173,9 @@ export class QldbSessionImpl implements QldbSession{
      * @returns Promise which fulfills with an array of table names.
      */
     async getTableNames(): Promise<string[]> {
-        let statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
+        const statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
         return await this.executeLambda(async (transactionExecutor) => {
-            let result: ResultStream = await transactionExecutor.executeStream(statement);
+            const result: ResultStream = await transactionExecutor.executeStream(statement);
             return await this._tableNameHelper(result);
         });
     }
@@ -187,7 +187,7 @@ export class QldbSessionImpl implements QldbSession{
      */
     async startTransaction(): Promise<Transaction> {
         this._throwIfClosed();
-        let transaction: Transaction = new Transaction(
+        const transaction: Transaction = new Transaction(
             this._communicator,
             await this._communicator.startTransaction()
         );
@@ -195,9 +195,9 @@ export class QldbSessionImpl implements QldbSession{
     }
 
     /**
-     * Determine if the session is alive by sending an abort message. This should only be used when the session is 
+     * Determine if the session is alive by sending an abort message. This should only be used when the session is
      * known to not be in use, otherwise the state will be abandoned.
-     * @returns Promise which fulfills with a boolean.
+     * @returns Promise which fulfills with true if the abort succeeded, otherwise false.
      */
     async _abortOrClose(): Promise<boolean> {
         if (this._isClosed) {
@@ -225,7 +225,7 @@ export class QldbSessionImpl implements QldbSession{
                 await transaction.abort();
             }
         } catch (e) {
-            warn("Ignored error while aborting transaction during execution: " + e);
+            warn(`Ignored error while aborting transaction during execution: ${e}.`);
         }
     }
 
@@ -235,41 +235,43 @@ export class QldbSessionImpl implements QldbSession{
      * @returns Promise which fulfills with void.
      */
     private async _retrySleep(attemptNumber: number): Promise<void> {
-        let jitterRand: number = Math.random();
-        let exponentialBackoff: number = Math.min(SLEEP_CAP_MS, Math.pow(SLEEP_BASE_MS, attemptNumber));
-        let sleep = (milliseconds: number) => {
+        const jitterRand: number = Math.random();
+        const exponentialBackoff: number = Math.min(SLEEP_CAP_MS, Math.pow(SLEEP_BASE_MS, attemptNumber));
+        const sleep = (milliseconds: number) => {
             return new Promise(resolve => setTimeout(resolve, milliseconds));
         };
-        await sleep(jitterRand * (exponentialBackoff + 1));
+        (async() => {
+            await sleep(jitterRand * (exponentialBackoff + 1));
+        })();
+
     }
 
     /**
      * Helper function for getTableNames.
      * @param resultStream The result from QLDB containing the table names.
-     * @returns Promise which fulfills with an array of table names.
-     * @throws {@linkcode ClientException} when the reader does not contain a struct or if the value within the struct 
-     *                                     is not of type string.
+     * @returns Promise which fulfills with an array of table names or rejects with a {@linkcode ClientException}
+     * when the reader does not contain a struct or if the value within the struct is not of type string.
      */
     private _tableNameHelper(resultStream: ResultStream): Promise<string[]> {
-        return new Promise(res => {
-            let listOfStrings: string[] = [];
+        return new Promise((res, rej) => {
+            const listOfStrings: string[] = [];
             resultStream.on("data", function(reader) {
-                let type = reader.next();
+                let type: any = reader.next();
                 if (type.binaryTypeId !== IonTypes.STRUCT.binaryTypeId) {
-                    throw new ClientException(
+                    return rej(new ClientException(
                         `Unexpected format: expected struct, but got IonType with binary encoding: ` +
                         `${type.binaryTypeId}`
-                    );
+                    ));
                 }
                 reader.stepIn();
                 type = reader.next();
                 if (type.binaryTypeId === IonTypes.STRING.binaryTypeId) {
                     listOfStrings.push(reader.stringValue());
                 } else {
-                    throw new ClientException(
+                    return rej(new ClientException(
                         `Unexpected format: expected string, but got IonType with binary encoding: ` +
                         `${type.binaryTypeId}.`
-                    );
+                    ));
                 }
             }).on("end", function() {
                 res(listOfStrings);

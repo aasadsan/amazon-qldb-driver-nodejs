@@ -12,7 +12,8 @@
  */
 
 import { Page } from "aws-sdk/clients/qldbsession";
-import { makeReader } from "ion-js";
+import { makeReader, Reader } from "ion-js";
+import { Lock } from "semaphore-async-await"
 import { Readable } from "stream";
 
 import { Communicator } from "./Communicator";
@@ -31,6 +32,7 @@ export class ResultStream extends Readable {
     private _shouldPushCachedPage: boolean;
     private _lastRetrievedIndex: number;
     private _isClosed: boolean;
+    private _lock: Lock;
 
     /**
      * Create a ResultStream.
@@ -46,41 +48,47 @@ export class ResultStream extends Readable {
         this._shouldPushCachedPage = true;
         this._lastRetrievedIndex = 0;
         this._isClosed = false;
+        this._lock = new Lock();
     }
 
     /**
-     * Close this ResultStream. No-op if already closed.
+     * Close this ResultStream.
      */
     close(): void {
-        if (this._isClosed) {
-            return;
-        }
         this._isClosed = true;
     }
 
     /**
      * Implementation of the `readable.read` method for the Node Streams Readable Interface.
-     * @param size The number of bytes to read asynchronously. This is currently not being used as only object mode is 
+     * @param size The number of bytes to read asynchronously. This is currently not being used as only object mode is
      * supported.
      * @throws {@linkcode ClientException} when this ResultStream is closed.
      */
-    _read(size: number): void {
+    _read(size?: number): void {
         if (this._isClosed) {
             throw new ClientException("Result stream is closed. Cannot stream data.");
         }
-        let childRead = async () => {
+        this._pushPageValues();
+    }
+
+    /**
+     * Pushes the values for the Node Streams Readable Interface. This method fetches the next page if is required and
+     * handles converting the values returned from QLDB into a Reader.
+     * @returns Promise which fulfills with void.
+     */
+    private async _pushPageValues(): Promise<void> {
+        await this._lock.acquire();
+        try {
             if (this._shouldPushCachedPage) {
                 this._shouldPushCachedPage = false;
-            } else {
+            } else if (this._cachedPage.NextPageToken) {
+                this._cachedPage = await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
                 this._lastRetrievedIndex = 0;
-                do {
-                    this._cachedPage = await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
-                } while (this._cachedPage.NextPageToken !== null && this._cachedPage.Values.length === 0);
             }
-            for (let i = this._lastRetrievedIndex; i < this._cachedPage.Values.length; i++) {
-                let reader = makeReader(Result._handleBlob(this._cachedPage.Values[i].IonBinary));
+            for (let i: number = this._lastRetrievedIndex; i < this._cachedPage.Values.length; i++) {
+                const reader: Reader = makeReader(Result._handleBlob(this._cachedPage.Values[i].IonBinary));
                 if (!this.push(reader)) {
-                    this._lastRetrievedIndex = i + 1;
+                    this._lastRetrievedIndex = i;
                     this._shouldPushCachedPage = this._lastRetrievedIndex < this._cachedPage.Values.length;
                     return;
                 }
@@ -89,7 +97,8 @@ export class ResultStream extends Readable {
                 this.push(null);
                 this._isClosed = true;
             }
-        };
-        childRead();
+        } finally {
+            this._lock.release();
+        }
     }
 }

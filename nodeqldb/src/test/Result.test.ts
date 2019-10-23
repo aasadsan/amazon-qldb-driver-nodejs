@@ -11,94 +11,137 @@
  * and limitations under the License.
  */
 
-import { Page, ValueHolder} from "aws-sdk/clients/qldbsession";
+import { IonBinary, Page, ValueHolder} from "aws-sdk/clients/qldbsession";
+import * as chai from "chai";
+import * as chaiAsPromised from "chai-as-promised";
 import { makeReader, Reader} from "ion-js";
+import * as sinon from "sinon";
+import { Readable } from "stream";
 
 import { Communicator } from "../Communicator";
+import { ClientException } from "../errors/Errors";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 
-const chai = require("chai");
-const chaiAsPromised = require("chai-as-promised");
 chai.use(chaiAsPromised);
-const ionJs = require('ionJs')
-const { Readable } = require("stream");
-const sinon = require("sinon");
 const sandbox = sinon.createSandbox();
 
-let mockMessage: string = "foo";
-let mockNextPageToken: string = "nextPageToken";
-let mockTransactionId: string = "txnId";
+const testMessage: string = "foo";
+const testNextPageToken: string = "nextPageToken";
+const testTransactionId: string = "txnId";
 
-describe('Result test', function() {
-    let mockCommunicator: Communicator = sandbox.mock(Communicator);
-    let mockValueHolder: ValueHolder[] = [];
-    let mockPage: Page = {Values: mockValueHolder};
-    let mockPageWithToken: Page = {Values: mockValueHolder, NextPageToken: mockNextPageToken};
+const testValueHolder: ValueHolder[] = [];
+const testPage: Page = {
+    Values: testValueHolder
+};
+const testPageWithToken: Page = {
+    Values: testValueHolder,
+    NextPageToken: testNextPageToken
+};
 
-    after(function () {
+const mockCommunicator: Communicator = <Communicator><any> sandbox.mock(Communicator);
+
+describe("Result test", () => {
+
+    afterEach(() => {
         sandbox.restore();
     });
 
-    it('Test makeResult Static Factory Method', async function() {
-        let result = await Result.create(mockTransactionId, mockPage, mockCommunicator);
+    it("Test create static factory method", async () => {
+        const result = await Result.create(testTransactionId, testPage, mockCommunicator);
         chai.expect(result).to.be.an.instanceOf(Result);
     });
 
-    it('Test makeResult Static Factory Method with Undefined Page Object', async function() {
-        let result = await Result.create(mockTransactionId, undefined, mockCommunicator);
+    it("Test create with exception thrown from Communicator", async () => {
+        mockCommunicator.fetchPage = async () => {
+            throw new Error(testMessage);
+        };
+        await chai.expect(Result.create(testTransactionId, testPageWithToken, mockCommunicator)).to.be.rejected;
+    });
+
+    it("Test bufferResultStream static factory method", async () => {
+        const sampleResultStreamObject: ResultStream = new ResultStream(testTransactionId, testPage, mockCommunicator);
+        const result = await Result.bufferResultStream(sampleResultStreamObject);
         chai.expect(result).to.be.an.instanceOf(Result);
     });
 
-    it('Test makeResult with Exception Thrown from Communicator', async function() {
-        mockCommunicator.fetchPage = async function() {throw new Error(mockMessage)};
-        await chai.expect(Result.create(mockTransactionId, mockPageWithToken, mockCommunicator)).to.be.rejected;
-    });
+    it("Test getResultList With create static factory method with empty value for initial Page", async () => {
+        const value1: ValueHolder = {IonBinary: "a"};
+        const value2: ValueHolder = {IonBinary: "b"};
+        const value3: ValueHolder = {IonBinary: "c"};
+        const value4: ValueHolder = {IonBinary: "d"};
+        const allValues: ValueHolder[] = [value1, value2, value3, value4];
+        const finalTestPage: Page = {Values: allValues};
 
-    it('Test makeBufferedResult Static Factory Method', async function() {
-        let mockResultStream: ResultStream = new Readable({
-            objectMode: true,
-            read: function (size) {
-                return this.push(null);
-            }
-        });
-        let result = await Result.bufferResultStream(mockResultStream);
-        chai.expect(result).to.be.an.instanceOf(Result);
-    });
-
-    it('Test getResultList with makeResult Static Factory Method', async function() {
-        let value1: ValueHolder = {IonBinary: "a"};
-        let value2: ValueHolder = {IonBinary: "b"};
-        let value3: ValueHolder = {IonBinary: "c"};
-        let value4: ValueHolder = {IonBinary: "d"};
-        let allValues: ValueHolder[] = [value1, value2, value3, value4];
-
-        let finalMockPage: Page = {Values: allValues};
-        mockCommunicator.fetchPage = async function() {return finalMockPage};
-        let result: Result = await Result.create(mockTransactionId, mockPageWithToken, mockCommunicator);
-        let resultList = result.getResultList();
+        mockCommunicator.fetchPage = async () => {
+            return finalTestPage;
+        };
+        const result: Result = await Result.create(testTransactionId, testPageWithToken, mockCommunicator);
+        const resultList: Reader[] = result.getResultList();
 
         chai.assert.equal(allValues.length, resultList.length);
-        for (var i = 0; i < allValues.length; i++) {
-            chai.assert.equal(JSON.stringify(ionJs.makeReader(allValues[i].IonBinary)), JSON.stringify(resultList[i]));
+        resultList.forEach((result, i) => {
+            chai.assert.equal(
+                JSON.stringify(result),
+                JSON.stringify(makeReader(Result._handleBlob(allValues[i].IonBinary)))
+            );
+        });
+    });
+
+    it("Test getResultList with create static factory method with a value for initial Page", async () => {
+        const value1: ValueHolder = {IonBinary: "a"};
+        const value2: ValueHolder = {IonBinary: "b"};
+        const value3: ValueHolder = {IonBinary: "c"};
+        const value4: ValueHolder = {IonBinary: "d"};
+        const allValues: ValueHolder[] = [value1, value2, value3, value4];
+        const finalTestPage: Page = {Values: allValues};
+
+        const testValueHolder: ValueHolder[] = [{
+            IonBinary: "testVal"
+        }];
+        const testPageWithTokenAndValue: Page = {
+            Values: testValueHolder,
+            NextPageToken: testNextPageToken
+        };
+
+        mockCommunicator.fetchPage = async () => {
+            return finalTestPage;
+        };
+        const result: Result = await Result.create(testTransactionId, testPageWithTokenAndValue, mockCommunicator);
+        const resultList: Reader[] = result.getResultList();
+
+        chai.assert.equal(allValues.length + testValueHolder.length, resultList.length);
+        // Need to check if the initial Page's value and the first element in resultList is equivalent.
+        chai.assert.equal(
+            JSON.stringify(makeReader(Result._handleBlob(testValueHolder[0].IonBinary))),
+            JSON.stringify(resultList[0]));
+
+        // Now check if the rest of the resultList matches up with the Page's values returned from the Communicator.
+        for (let i = 0; i < allValues.length; i++) {
+            chai.assert.equal(
+                JSON.stringify(makeReader(Result._handleBlob(allValues[i].IonBinary))),
+                JSON.stringify(resultList[i+1])
+            );
         }
     });
 
-    it('Test getResultList with makeBufferedResult Static Factory Method', async function() {
-        let value1: ValueHolder = {IonBinary: "a"};
-        let value2: ValueHolder = {IonBinary: "b"};
-        let value3: ValueHolder = {IonBinary: "c"};
-        let value4: ValueHolder = {IonBinary: "d"};
-        let readers: Reader[] = [ionJs.makeReader(value1.IonBinary), 
-                                 ionJs.makeReader(value2.IonBinary),
-                                 ionJs.makeReader(value3.IonBinary),
-                                 ionJs.makeReader(value4.IonBinary)];
-        let eventCount = 0;
-        let mockResultStream: ResultStream = new Readable({
+    it("Test getResultList with makeBufferedResult static factory method", async () => {
+        const value1: ValueHolder = {IonBinary: "a"};
+        const value2: ValueHolder = {IonBinary: "b"};
+        const value3: ValueHolder = {IonBinary: "c"};
+        const value4: ValueHolder = {IonBinary: "d"};
+        const readers: Reader[] = [
+            makeReader(Result._handleBlob(value1.IonBinary)),
+            makeReader(Result._handleBlob(value2.IonBinary)),
+            makeReader(Result._handleBlob(value3.IonBinary)),
+            makeReader(Result._handleBlob(value4.IonBinary))
+        ];
+        let eventCount: number = 0;
+        const mockResultStream: Readable = new Readable({
             objectMode: true,
-            read: function (size) {
+            read: function(size) {
                 if (eventCount < readers.length) {
-                    eventCount = eventCount + 1;
+                    eventCount += 1;
                     return this.push(readers[eventCount-1]);
                 } else {
                     return this.push(null);
@@ -106,12 +149,31 @@ describe('Result test', function() {
             }
         });
 
-        let result = await Result.bufferResultStream(mockResultStream);
-        let resultList = result.getResultList();
+        const result: Result = await Result.bufferResultStream(<ResultStream> mockResultStream);
+        const resultList: Reader[] = result.getResultList();
 
         chai.assert.equal(readers.length, resultList.length);
-        for (var i = 0; i < readers.length; i++) {
-            chai.assert.equal(JSON.stringify(readers[i]), JSON.stringify(resultList[i]));
-        }
+        resultList.forEach((result, i) => {
+            chai.assert.equal(
+                JSON.stringify(result),
+                JSON.stringify(readers[i])
+            );
+        });
     });
-})
+
+    it("Test _handleBlob", async () => {
+        const blobBuffer: IonBinary = Buffer.from([0x62, 0x75, 0x66, 0x66, 0x65, 0x72]);
+        const blobUint8Array: IonBinary = new Uint8Array([1, 2, 3]);
+        const blobString: IonBinary = "test";
+        chai.expect(Result["_handleBlob"](blobBuffer)).to.be.an.instanceOf(Buffer);
+        chai.expect(Result["_handleBlob"](blobUint8Array)).to.be.an.instanceOf(Uint8Array);
+        chai.expect(Result["_handleBlob"](blobString)).to.be.a("string");
+    });
+
+    it("Test _handleBlob with invalid Blob type", async () => {
+        const invalidBlob: IonBinary = 123;
+        chai.expect(() => {
+            Result["_handleBlob"](invalidBlob);
+        }).to.throw(ClientException);
+    });
+});

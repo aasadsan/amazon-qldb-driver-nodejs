@@ -15,7 +15,7 @@ import { createHash } from "crypto";
 import { cryptoIonHasherProvider, IonHashReader, makeHashReader } from "ion-hash-js";
 import { makeReader } from "ion-js";
 
-let HASH_SIZE: number = 32
+const HASH_SIZE: number = 32
 
 /**
  * A QLDB hash is either a 256 bit number or a special empty hash.
@@ -42,10 +42,10 @@ export class QldbHash {
      * @returns An QldbHash object that contains the concatenated hash values.
      */
     dot(that: QldbHash): QldbHash {
-        let concatenated: Uint8Array = QldbHash._joinHashesPairwise(this.getQldbHash(), that.getQldbHash());
-        let newHashLib = createHash('sha256');
+        const concatenated: Uint8Array = QldbHash._joinHashesPairwise(this.getQldbHash(), that.getQldbHash());
+        const newHashLib = createHash("sha256");
         newHashLib.update(concatenated);
-        let newDigest: Uint8Array = newHashLib.digest();
+        const newDigest: Uint8Array = newHashLib.digest();
         return new QldbHash(newDigest);
     }
 
@@ -71,13 +71,13 @@ export class QldbHash {
      * @returns A QldbHash object that contains Ion hash.
      */
     static toQldbHash(value: any): QldbHash {
-        if (typeof value === 'string') {
+        if (typeof value === "string") {
             value = "\"" + value + "\"";
         }
-        let hashReader: IonHashReader = makeHashReader(makeReader(value), cryptoIonHasherProvider('sha256'));
+        const hashReader: IonHashReader = makeHashReader(makeReader(value), cryptoIonHasherProvider("sha256"));
         hashReader.next();
         hashReader.next();
-        let digest: Uint8Array = hashReader.digest();
+        const digest: Uint8Array = hashReader.digest();
         return new QldbHash(digest);
     }
 
@@ -89,12 +89,12 @@ export class QldbHash {
      */
     static _concatenate(resultConstructor, ...arrays): Uint8Array {
         let totalLength = 0;
-        for (let arr of arrays) {
+        for (const arr of arrays) {
             totalLength += arr.length;
         }
-        let result = new resultConstructor(totalLength);
+        const result = new resultConstructor(totalLength);
         let offset = 0;
-        for (let arr of arrays) {
+        for (const arr of arrays) {
             result.set(arr, offset);
             offset += arr.length;
         }
@@ -105,7 +105,7 @@ export class QldbHash {
      * Compares two hashes by their **signed** byte values in little-endian order.
      * @param hash1 The hash value to compare.
      * @param hash2 The hash value to compare.
-     * @returns Zero if the hash values are equal, otherwise return the difference of the first pair of non-matching 
+     * @returns Zero if the hash values are equal, otherwise return the difference of the first pair of non-matching
      *          bytes.
      * @throws RangeError When the hash is not the correct hash size.
      */
@@ -114,7 +114,7 @@ export class QldbHash {
             throw new RangeError("Invalid hash.");
         }
         for (var i = hash1.length-1; i >= 0; i--) {
-            let difference: number = (hash1[i]<<24 >>24) - (hash2[i]<<24 >>24);
+            const difference: number = (hash1[i]<<24 >>24) - (hash2[i]<<24 >>24);
             if (difference !== 0) {
                 return difference;
             }

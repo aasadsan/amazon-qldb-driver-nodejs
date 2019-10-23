@@ -13,6 +13,7 @@
 
 import { CommitTransactionResult, ExecuteStatementResult } from "aws-sdk/clients/qldbsession";
 import { makeBinaryWriter, toBase64, Writer } from "ion-js";
+import { Lock } from "semaphore-async-await";
 
 import { Communicator } from "./Communicator";
 import { ClientException, isOccConflictException, TransactionClosedError } from "./errors/Errors";
@@ -26,8 +27,8 @@ import { ResultStream } from "./ResultStream";
  *
  * Every transaction is tied to a parent (Pooled)QldbSession, meaning that if the parent session is closed or
  * invalidated, the child transaction is automatically closed and cannot be used. Only one transaction can be active at
- * any given time per parent session, and thus every transaction should call {@linkcode Transaction.abort} or 
- * {@linkcode Transaction.commit} when it is no longer needed, or when a new transaction is desired from the parent 
+ * any given time per parent session, and thus every transaction should call {@linkcode Transaction.abort} or
+ * {@linkcode Transaction.commit} when it is no longer needed, or when a new transaction is desired from the parent
  * session.
  *
  * An InvalidSessionException indicates that the parent session is dead, and a new transaction cannot be created
@@ -42,12 +43,13 @@ import { ResultStream } from "./ResultStream";
  * Child {@linkcode ResultStream} objects will be closed when this transaction is aborted or committed.
  */
 export class Transaction {
-    _communicator: Communicator;
-    _txnId: string;
-    _isClosed: boolean;
-    _resultStreams: ResultStream[];
-    _registeredParameters: Writer[];
-    _txnHash: QldbHash;
+    private _communicator: Communicator;
+    private _txnId: string;
+    private _isClosed: boolean;
+    private _resultStreams: ResultStream[];
+    private _registeredParameters: Writer[];
+    private _txnHash: QldbHash;
+    private _hashLock: Lock;
 
     /**
      * Create a Transaction.
@@ -61,6 +63,7 @@ export class Transaction {
         this._resultStreams = [];
         this._registeredParameters = [];
         this._txnHash = QldbHash.toQldbHash(txnId);
+        this._hashLock = new Lock();
     }
 
     /**
@@ -76,6 +79,20 @@ export class Transaction {
     }
 
     /**
+     * Clears the currently registered parameters for this transaction.
+     */
+    clearParameters(): void {
+        this._registeredParameters.forEach((writer: Writer) => {
+            try {
+                writer.close();
+            } catch (e) {
+                warn(`Ignored error closing writer when clearing parameters: ${e}.`);
+            }
+        });
+        this._registeredParameters = [];
+    }
+
+    /**
      * Commits and closes child ResultStream objects.
      * @returns Promise which fulfills with void.
      * @throws {@linkcode TransactionClosedError} when this transaction is closed.
@@ -86,14 +103,15 @@ export class Transaction {
             throw new TransactionClosedError();
         }
         try {
-            let commitTxnResult: CommitTransactionResult = await this._communicator.commit(
-                this._txnId, 
+            await this._hashLock.acquire();
+            const commitTxnResult: CommitTransactionResult = await this._communicator.commit(
+                this._txnId,
                 this._txnHash.getQldbHash()
             );
             if (toBase64(this._txnHash.getQldbHash()) !== toBase64(<Uint8Array>(commitTxnResult.CommitDigest))) {
                 throw new ClientException(
-                    `Transaction's commit digest did not match returned value from QLDB. 
-                    Please retry with a new transaction. Transaction ID: ${this._txnId}`
+                    `Transaction's commit digest did not match returned value from QLDB.
+                    Please retry with a new transaction. Transaction ID: ${this._txnId}.`
                 );
             }
             this._isClosed = true;
@@ -104,11 +122,12 @@ export class Transaction {
             try {
                 await this._communicator.abortTransaction();
             } catch (e2) {
-                warn("Ignored error aborting transaction after a failed commit: " + e2);
+                warn(`Ignored error aborting transaction after a failed commit: ${e2}.`);
             }
             throw e;
         } finally {
             this._internalClose();
+            this._hashLock.release();
         }
     }
 
@@ -118,8 +137,8 @@ export class Transaction {
      * @returns Promise which fulfills with a fully-buffered Result.
      */
     async executeInline(statement: string): Promise<Result> {
-        let result: ExecuteStatementResult = await this._sendExecute(statement);
-        let inlineResult = Result.create(this._txnId, result.FirstPage, this._communicator);
+        const result: ExecuteStatementResult = await this._sendExecute(statement);
+        const inlineResult = Result.create(this._txnId, result.FirstPage, this._communicator);
         return inlineResult;
     }
 
@@ -129,8 +148,8 @@ export class Transaction {
      * @returns Promise which fulfills with a ResultStream.
      */
     async executeStream(statement: string): Promise<ResultStream> {
-        let result: ExecuteStatementResult = await this._sendExecute(statement);
-        let resultStream = new ResultStream(this._txnId, result.FirstPage, this._communicator);
+        const result: ExecuteStatementResult = await this._sendExecute(statement);
+        const resultStream = new ResultStream(this._txnId, result.FirstPage, this._communicator);
         this._resultStreams.push(resultStream);
         return resultStream;
     }
@@ -145,13 +164,13 @@ export class Transaction {
 
     /**
      * Create a writer for a parameter.
-     * 
-     * Each transaction tracks the registered parameters to be used for the next execution. When the next execution 
+     *
+     * Each transaction tracks the registered parameters to be used for the next execution. When the next execution
      * occurs, the parameters are used and then cleared. Parameters must then be registered for the next execution.
-     * 
-     * Registering a parameter that has already been registered will clear the previously registered writer for that 
+     *
+     * Registering a parameter that has already been registered will clear the previously registered writer for that
      * parameter.
-     * 
+     *
      * @param paramNumber Represents the i-th parameter we're registering for the next execution in the transaction.
      *                    paramNumber is a 1-based counter.
      * @returns Binary writer for the parameter.
@@ -161,7 +180,7 @@ export class Transaction {
         if (paramNumber < 1) {
             throw new ClientException("The 1-based parameter number cannot be less than 1.");
         }
-        let ionWriter: Writer = makeBinaryWriter();
+        const ionWriter: Writer = makeBinaryWriter();
         this._registeredParameters[paramNumber-1] = ionWriter;
         return ionWriter;
     }
@@ -173,8 +192,8 @@ export class Transaction {
      */
     private _findMissingParams(): string {
         let missingParams: string = "";
-        for (var paramNum = 0; paramNum < this._registeredParameters.length; paramNum++) {
-            if (typeof this._registeredParameters[paramNum] === 'undefined') {
+        for (let paramNum: number = 0; paramNum < this._registeredParameters.length; paramNum++) {
+            if (typeof this._registeredParameters[paramNum] === "undefined") {
                 if (missingParams === "") {
                     missingParams += (paramNum + 1);
                 } else {
@@ -188,7 +207,7 @@ export class Transaction {
     /**
      * Mark the transaction as closed, and stop streaming for any ResultStream objects.
      */
-    private _internalClose() {
+    private _internalClose(): void {
         this._isClosed = true;
         while (this._resultStreams.length !== 0) {
             this._resultStreams.pop().close();
@@ -196,7 +215,7 @@ export class Transaction {
     }
 
     /**
-     * Helper method to execute statement against QLDB. When an execution is successful, the list of registered 
+     * Helper method to execute statement against QLDB. When an execution is successful, the list of registered
      * parameters is cleared. Parameters must then be registered for the next execution.
      * @param statement A statement to execute against QLDB as a string.
      * @returns Promise which fulfills with a ExecuteStatementResult object.
@@ -207,15 +226,23 @@ export class Transaction {
         if (this._isClosed) {
             throw new TransactionClosedError();
         }
-    	let missingParams: string = this._findMissingParams();
+        const missingParams: string = this._findMissingParams();
         if (missingParams !== "") {
             throw new ClientException(`Parameter #${missingParams} is/are missing.`);
         }
-        this._updateHash(statement, this._registeredParameters);
-        let result: ExecuteStatementResult = await this._communicator.executeStatement(this._txnId, statement, 
-            this._registeredParameters);
-        this._registeredParameters = [];
-        return result;
+        try {
+            await this._hashLock.acquire();
+            this._updateHash(statement, this._registeredParameters);
+            const result: ExecuteStatementResult = await this._communicator.executeStatement(
+                this._txnId,
+                statement,
+                this._registeredParameters
+            );
+            this._registeredParameters = [];
+            return result;
+        } finally {
+            this._hashLock.release();
+        }
     }
 
     /**
@@ -225,9 +252,17 @@ export class Transaction {
      */
     private _updateHash(statement: string, parameters: Writer[]): void {
         let statementHash: QldbHash = QldbHash.toQldbHash(statement);
-        for (var i = 0; i < parameters.length; i++) {
-            statementHash = statementHash.dot(QldbHash.toQldbHash(parameters[i]));
-        }
+        parameters.forEach((writer: Writer) => {
+            try {
+                writer.close();
+            } catch (e) {
+                warn(
+                    "Error encountered when attempting to close parameter writer. This warning can be ignored if the " +
+                    `writer was manually closed: ${e}.`
+                );
+            }
+            statementHash = statementHash.dot(QldbHash.toQldbHash(writer.getBytes()));
+        });
         this._txnHash = this._txnHash.dot(statementHash);
     }
 }

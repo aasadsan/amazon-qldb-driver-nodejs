@@ -36,8 +36,15 @@ export class TransactionExecutor {
      * Abort the transaction and roll back any changes.
      * @throws {@linkcode LambdaAbortedError} when called.
      */
-    abort() {
+    abort(): void {
         throw new LambdaAbortedError();
+    }
+
+    /**
+     * Clear the registered parameters for this transaction.
+     */
+    clearParameters(): void {
+        this._transaction.clearParameters();
     }
 
     /**
@@ -58,8 +65,8 @@ export class TransactionExecutor {
      */
     async executeStream(statement: string): Promise<ResultStream> {
         return await this._transaction.executeStream(statement);
-    }  
-    
+    }
+
     /**
     * Get the transaction ID.
     * @returns The transaction ID.
@@ -70,13 +77,13 @@ export class TransactionExecutor {
 
     /**
      * Create a writer for a parameter.
-     * 
-     * Each transaction tracks the registered parameters to be used for the next execution. When the next execution 
+     *
+     * Each transaction tracks the registered parameters to be used for the next execution. When the next execution
      * occurs, the parameters are used and then cleared. Parameters must then be registered for the next execution.
-     * 
-     * Registering a parameter that has already been registered will clear the previously registered writer for that 
+     *
+     * Registering a parameter that has already been registered will clear the previously registered writer for that
      * parameter.
-     * 
+     *
      * @param paramNumber Represents the i-th parameter we're registering for the next execution in the transaction.
      *                    paramNumber is a 1-based counter.
      * @returns Binary writer for the parameter.

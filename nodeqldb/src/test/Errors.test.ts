@@ -11,120 +11,152 @@
  * and limitations under the License.
  */
 
-import { 
-  ClientException,
-  LambdaAbortedError,
-  SessionClosedError,
-  TransactionClosedError,
-  DriverClosedError,
-  isOccConflictException, 
-  isRetriableException,
-  isInvalidSessionException,
-  isInvalidParameterException } from "../errors/Errors";
-  import * as logUtil from "../logUtil";
+import * as chai from "chai";
+import * as chaiAsPromised from "chai-as-promised";
+import * as sinon from "sinon";
 
-const chai = require("chai");
-const chaiAsPromised = require("chai-as-promised");
+import {
+    ClientException,
+    DriverClosedError,
+    isInvalidParameterException,
+    isInvalidSessionException,
+    isOccConflictException,
+    isResourceNotFoundException,
+    isResourcePreconditionNotMetException,
+    isRetriableException,
+    LambdaAbortedError,
+    SessionClosedError,
+    SessionPoolEmptyError,
+    TransactionClosedError
+} from "../errors/Errors";
+import * as logUtil from "../logUtil";
+
 chai.use(chaiAsPromised);
-const sinon = require("sinon");
 const sandbox = sinon.createSandbox();
 
-let mockMessage: string = "foo";
+const testMessage: string = "foo";
 
-describe('Errors test', function() {
+describe("Errors test", () => {
 
-    afterEach(function () {
-      sandbox.restore();
-    });
-    
-    it('Test ClientException', function() {
-      let logSpy = sandbox.spy(logUtil, "error");
-      let error = new ClientException(mockMessage);
-      chai.assert.equal(error.name, "ClientException");
-      chai.assert.equal(error.message, mockMessage);
-      sinon.assert.calledOnce(logSpy);
+    afterEach(() => {
+        sandbox.restore();
     });
 
-    it('Test SessionClosedError', function() {
-      let logSpy = sandbox.spy(logUtil, "error");
-      let error = new SessionClosedError();
-      chai.assert.equal(error.name, "SessionClosedError");
-      sinon.assert.calledOnce(logSpy);
+    it("Test ClientException", () => {
+        const logSpy = sandbox.spy(logUtil, "error");
+        const error = new ClientException(testMessage);
+        chai.assert.equal(error.name, "ClientException");
+        chai.assert.equal(error.message, testMessage);
+        sinon.assert.calledOnce(logSpy);
     });
 
-    it('Test TransactionClosedError', function() {
-      let logSpy = sandbox.spy(logUtil, "error");
-      let error = new TransactionClosedError();
-      chai.assert.equal(error.name, "TransactionClosedError");
-      sinon.assert.calledOnce(logSpy);
+    it("Test DriverClosedError", () => {
+        const logSpy = sandbox.spy(logUtil, "error");
+        const error = new DriverClosedError();
+        chai.assert.equal(error.name, "DriverClosedError");
+        sinon.assert.calledOnce(logSpy);
     });
 
-    it('Test DriverClosedError', function() {
-      let logSpy = sandbox.spy(logUtil, "error");
-      let error = new DriverClosedError();
-      chai.assert.equal(error.name, "DriverClosedError");
-      sinon.assert.calledOnce(logSpy);
+    it("Test LambdaAbortedError", () => {
+        const logSpy = sandbox.spy(logUtil, "error");
+        const error = new LambdaAbortedError();
+        chai.assert.equal(error.name, "LambdaAbortedError");
+        sinon.assert.calledOnce(logSpy);
     });
 
-    it('Test LambdaAbortedError', function() {
-      let logSpy = sandbox.spy(logUtil, "error");
-      let error = new LambdaAbortedError();
-      chai.assert.equal(error.name, "LambdaAbortedError");
-      sinon.assert.calledOnce(logSpy);
+    it("Test SessionClosedError", () => {
+        const logSpy = sandbox.spy(logUtil, "error");
+        const error = new SessionClosedError();
+        chai.assert.equal(error.name, "SessionClosedError");
+        sinon.assert.calledOnce(logSpy);
     });
 
-    it('Test IsOccConflictException True', function() {
-      let mockError = {code: "OccConflictException"};
-      chai.assert.isTrue(isOccConflictException(mockError));
+    it("Test SessionPoolEmptyError", () => {
+        const logSpy = sandbox.spy(logUtil, "error");
+        const error = new SessionPoolEmptyError(1);
+        chai.assert.equal(error.name, "SessionPoolEmptyError");
+        sinon.assert.calledOnce(logSpy);
     });
 
-    it('Test IsOccConflictException False', function() {
-      let mockError = {code: "NotOccConflictException"};
-      chai.assert.isFalse(isOccConflictException(mockError));
+    it("Test TransactionClosedError", () => {
+        const logSpy = sandbox.spy(logUtil, "error");
+        const error = new TransactionClosedError();
+        chai.assert.equal(error.name, "TransactionClosedError");
+        sinon.assert.calledOnce(logSpy);
     });
 
-    it('Test IsInvalidSessionException True', function() {
-      let mockError = {code: "InvalidSessionException"};
-      chai.assert.isTrue(isInvalidSessionException(mockError));
+    it("Test isInvalidParameterException true", () => {
+        const mockError = {code: "InvalidParameterException"};
+        chai.assert.isTrue(isInvalidParameterException(mockError));
     });
 
-    it('Test IsInvalidSessionException False', function() {
-      let mockError = {code: "NotInvalidSessionException"};
-      chai.assert.isFalse(isInvalidSessionException(mockError));
+    it("Test isInvalidParameterException false", () => {
+        const mockError = {code: "NotInvalidParameterException"};
+        chai.assert.isFalse(isInvalidParameterException(mockError));
     });
 
-    it('Test IsInvalidParameterException True', function() {
-      let mockError = {code: "InvalidParameterException"};
-      chai.assert.isTrue(isInvalidParameterException(mockError));
+    it("Test isInvalidSessionException true", () => {
+        const mockError = {code: "InvalidSessionException"};
+        chai.assert.isTrue(isInvalidSessionException(mockError));
     });
 
-    it('Test IsInvalidParameterException False', function() {
-      let mockError = {code: "NotInvalidParameterException"};
-      chai.assert.isFalse(isInvalidParameterException(mockError));
+    it("Test isInvalidSessionException false", () => {
+        const mockError = {code: "NotInvalidSessionException"};
+        chai.assert.isFalse(isInvalidSessionException(mockError));
     });
 
-    it('Test IsRetriableException StatusCode 500', function() {
-      let mockError = {statusCode: 500, code: "NotRetriableException"};
-      chai.assert.isTrue(isRetriableException(mockError));
+    it("Test isOccConflictException true", () => {
+        const mockError = {code: "OccConflictException"};
+        chai.assert.isTrue(isOccConflictException(mockError));
     });
 
-    it('Test IsRetriableException StatusCode 503', function() {
-      let mockError = {statusCode: 503, code: "NotRetriableException"};
-      chai.assert.isTrue(isRetriableException(mockError));
+    it("Test isOccConflictException false", () => {
+        const mockError = {code: "NotOccConflictException"};
+        chai.assert.isFalse(isOccConflictException(mockError));
     });
 
-    it('Test IsRetriableException Code NoHttpResponseException', function() {
-      let mockError = {code: "NoHttpResponseException", statusCode: 200};
-      chai.assert.isTrue(isRetriableException(mockError));
+    it("Test isResourceNotFoundException true", () => {
+        const mockError = {code: "ResourceNotFoundException"};
+        chai.assert.isTrue(isResourceNotFoundException(mockError));
     });
 
-    it('Test IsRetriableException Code SocketTimeoutException', function() {
-      let mockError = {code: "SocketTimeoutException", statusCode: 200};
-      chai.assert.isTrue(isRetriableException(mockError));
+    it("Test isResourceNotFoundException false", () => {
+        const mockError = {code: "NotResourceNotFoundException"};
+        chai.assert.isFalse(isResourceNotFoundException(mockError));
     });
 
-    it('Test IsRetriableException False', function() {
-      let mockError = {code: "NotRetriableException", statusCode: 200};
-      chai.assert.isFalse(isRetriableException(mockError));
+    it("Test isResourcePreconditionNotMetException true", () => {
+        const mockError = {code: "ResourcePreconditionNotMetException"};
+        chai.assert.isTrue(isResourcePreconditionNotMetException(mockError));
     });
-})
+
+    it("Test isResourcePreconditionNotMetException false", () => {
+        const mockError = {code: "NotResourcePreconditionNotMetException"};
+        chai.assert.isFalse(isResourcePreconditionNotMetException(mockError));
+    });
+
+    it("Test isRetriableException with statusCode 500", () => {
+        const mockError = {statusCode: 500, code: "NotRetriableException"};
+        chai.assert.isTrue(isRetriableException(mockError));
+    });
+
+    it("Test isRetriableException with statusCode 503", () => {
+        const mockError = {statusCode: 503, code: "NotRetriableException"};
+        chai.assert.isTrue(isRetriableException(mockError));
+    });
+
+    it("Test isRetriableException with code NoHttpResponseException", () => {
+        const mockError = {code: "NoHttpResponseException", statusCode: 200};
+        chai.assert.isTrue(isRetriableException(mockError));
+    });
+
+    it("Test isRetriableException with code SocketTimeoutException", () => {
+        const mockError = {code: "SocketTimeoutException", statusCode: 200};
+        chai.assert.isTrue(isRetriableException(mockError));
+    });
+
+    it("Test isRetriableException false", () => {
+        const mockError = {code: "NotRetriableException", statusCode: 200};
+        chai.assert.isFalse(isRetriableException(mockError));
+    });
+});

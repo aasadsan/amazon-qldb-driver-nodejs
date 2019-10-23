@@ -11,110 +11,116 @@
  * and limitations under the License.
  */
 
-import { Writer, makeBinaryWriter } from "ion-js";
+import { makeBinaryWriter, Writer } from "ion-js";
+import * as chai from "chai";
+import * as chaiAsPromised from "chai-as-promised";
+import * as sinon from "sinon";
 
-import * as logUtil from "../logUtil";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
 import { TransactionExecutor } from "../TransactionExecutor";
 
-const chai = require("chai");
-const chaiAsPromised = require("chai-as-promised");
 chai.use(chaiAsPromised);
-const sinon = require("sinon");
 const sandbox = sinon.createSandbox();
 
-let mockStatement: string = "SELECT * FROM foo";
-let mockMessage: string = "foo";
-let mockTransactionId: string = "txnId";
+const testStatement: string = "SELECT * FROM foo";
+const testMessage: string = "foo";
+const testTransactionId: string = "txnId";
+const testWriter: Writer = makeBinaryWriter();
+testWriter.writeString(testMessage);
 
-describe('TransactionExecutor test', function() {
-  let mockResult: Result = sandbox.mock(Result);
-  let mockResultStream: ResultStream = sandbox.mock(ResultStream);
-  let mockTransaction: Transaction = sandbox.mock(Transaction);
-  let mockWriter: Writer = makeBinaryWriter();
-  mockWriter.writeString(mockMessage);
-  let transactionExecutor: TransactionExecutor;
+const mockResult: Result = <Result><any> sandbox.mock(Result);
+const mockResultStream: ResultStream = <ResultStream><any> sandbox.mock(ResultStream);
+const mockTransaction: Transaction = <Transaction><any> sandbox.mock(Transaction);
 
-  beforeEach(function () {
-    transactionExecutor = new TransactionExecutor(mockTransaction);
-  });
+let transactionExecutor: TransactionExecutor;
 
-  after(function () {
-    sandbox.restore();
-  });
+describe("TransactionExecutor test", () => {
 
-  it('Test Abort', async function() {
-    mockTransaction.abort = async function () {};
-    let abortSpy = sandbox.spy(mockTransaction, "abort");
-    let errorMessage = await chai.expect(transactionExecutor.abort()).to.be.rejected;
-    chai.assert.equal(errorMessage.name, "LambdaAbortedError");
-    sinon.assert.calledOnce(abortSpy);
-  });
+    beforeEach(() => {
+        transactionExecutor = new TransactionExecutor(mockTransaction);
+    });
 
-  it('Test Abort When Exception', async function() {
-    mockTransaction.abort = async function () {throw new Error(mockMessage);};
-    let abortSpy = sandbox.spy(mockTransaction, "abort");
-    let logWarnSpy = sandbox.spy(logUtil, "warn");
-    let logErrorSpy = sandbox.spy(logUtil, "error");
-    let errorMessage = await chai.expect(transactionExecutor.abort()).to.be.rejected;
-    chai.assert.equal(errorMessage.name, "LambdaAbortedError");
-    sinon.assert.calledOnce(logWarnSpy);
-    sinon.assert.calledOnce(logErrorSpy);
-    sinon.assert.calledOnce(abortSpy);
-  });
-  
-  it('Test Execute Query Inline', async function() {
-    mockTransaction.executeInline = async function () {return mockResult};
-    let transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
-    let result = await transactionExecutor.executeInline(mockStatement);
-    chai.assert.equal(mockResult, result);
-    sinon.assert.calledOnce(transactionExecuteSpy);
-    sinon.assert.calledWith(transactionExecuteSpy, mockStatement);
-  });
+    afterEach(() => {
+        sandbox.restore();
+    });
 
-  it('Test Execute Query Stream', async function() {
-    mockTransaction.executeStream = async function () {return mockResultStream};
-    let transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
-    let resultStream = await transactionExecutor.executeStream(mockStatement);
-    chai.assert.equal(mockResultStream, resultStream);
-    sinon.assert.calledOnce(transactionExecuteSpy);
-    sinon.assert.calledWith(transactionExecuteSpy, mockStatement);
-  });
+    it("Test abort", () => {
+        chai.expect(() => {
+            transactionExecutor.abort();
+        }).to.throw();
+    });
 
-  it('Test Execute Query Inline with Error', async function() {
-    mockTransaction.executeInline = async function () {throw new Error(mockMessage);};
-    let transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
-    let errorMessage = await chai.expect(transactionExecutor.executeInline(mockStatement)).to.be.rejected;
-    chai.assert.equal(errorMessage.name, "Error");
-    sinon.assert.calledOnce(transactionExecuteSpy);
-    sinon.assert.calledWith(transactionExecuteSpy, mockStatement);
-  });
+    it("Test clearParameters", () => {
+        mockTransaction.clearParameters = () => {};
+        const transactionClearSpy = sandbox.spy(mockTransaction, "clearParameters");
+        transactionExecutor.clearParameters();
+        sinon.assert.calledOnce(transactionClearSpy);
+    });
 
-  it('Test Execute Query Stream with Error', async function() {
-    mockTransaction.executeStream = async function () {throw new Error(mockMessage);};
-    let transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
-    let errorMessage = await chai.expect(transactionExecutor.executeStream(mockStatement)).to.be.rejected;
-    chai.assert.equal(errorMessage.name, "Error");
-    sinon.assert.calledOnce(transactionExecuteSpy);
-    sinon.assert.calledWith(transactionExecuteSpy, mockStatement);
-  });    
+    it("Test executeInline", async () => {
+        mockTransaction.executeInline = async () => {
+            return mockResult;
+        };
+        const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
+        const result = await transactionExecutor.executeInline(testStatement);
+        chai.assert.equal(mockResult, result);
+        sinon.assert.calledOnce(transactionExecuteSpy);
+        sinon.assert.calledWith(transactionExecuteSpy, testStatement);
+    });
 
-  it('Test Get Transaction ID', async function() {
-    mockTransaction.getTransactionId = function () {return mockTransactionId;};
-    let transactionIdSpy = sandbox.spy(mockTransaction, "getTransactionId");
-    let transactionId = transactionExecutor.getTransactionId();
-    chai.assert.equal(transactionId, mockTransactionId);
-    sinon.assert.calledOnce(transactionIdSpy);
-  }); 
-  
-  it('Test Register Parameter', async function() {
-    mockTransaction.registerParameter = function () {return mockWriter;};
-    let registerParamSpy = sandbox.spy(mockTransaction, "registerParameter");
-    let writer = transactionExecutor.registerParameter(1);
-    chai.assert.equal(writer, mockWriter);
-    sinon.assert.calledOnce(registerParamSpy);
-    sinon.assert.calledWith(registerParamSpy, 1);
-  }); 
-})
+    it("Test executeInline with exception", async () => {
+        mockTransaction.executeInline = async () => {
+            throw new Error(testMessage);
+        };
+        const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
+        const errorMessage = await chai.expect(transactionExecutor.executeInline(testStatement)).to.be.rejected;
+        chai.assert.equal(errorMessage.name, "Error");
+        sinon.assert.calledOnce(transactionExecuteSpy);
+        sinon.assert.calledWith(transactionExecuteSpy, testStatement);
+    });
+
+    it("Test executeStream", async () => {
+        mockTransaction.executeStream = async () => {
+            return mockResultStream;
+        };
+        const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
+        const resultStream = await transactionExecutor.executeStream(testStatement);
+        chai.assert.equal(mockResultStream, resultStream);
+        sinon.assert.calledOnce(transactionExecuteSpy);
+        sinon.assert.calledWith(transactionExecuteSpy, testStatement);
+    });
+
+    it("Test executeStream with exception", async () => {
+        mockTransaction.executeStream = async () => {
+            throw new Error(testMessage);
+        };
+        const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
+        const errorMessage = await chai.expect(transactionExecutor.executeStream(testStatement)).to.be.rejected;
+        chai.assert.equal(errorMessage.name, "Error");
+        sinon.assert.calledOnce(transactionExecuteSpy);
+        sinon.assert.calledWith(transactionExecuteSpy, testStatement);
+    });
+
+    it("Test getTransactionId", async () => {
+        mockTransaction.getTransactionId = () => {
+            return testTransactionId;
+        };
+        const transactionIdSpy = sandbox.spy(mockTransaction, "getTransactionId");
+        const transactionId = transactionExecutor.getTransactionId();
+        chai.assert.equal(transactionId, testTransactionId);
+        sinon.assert.calledOnce(transactionIdSpy);
+    });
+
+    it("Test registerParameter", async () => {
+        mockTransaction.registerParameter = () => {
+            return testWriter;
+        };
+        const registerParamSpy = sandbox.spy(mockTransaction, "registerParameter");
+        const writer = transactionExecutor.registerParameter(1);
+        chai.assert.equal(writer, testWriter);
+        sinon.assert.calledOnce(registerParamSpy);
+        sinon.assert.calledWith(registerParamSpy, 1);
+    });
+});
