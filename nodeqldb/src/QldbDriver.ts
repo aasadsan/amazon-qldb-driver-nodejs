@@ -20,6 +20,8 @@ import { debug } from "./logUtil";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
 
+const VERSION: string = "0.1.0-beta";
+
 /**
  * Represents a factory for creating sessions to a specific ledger within QLDB. This class or
  * {@linkcode PooledQldbDriver} should be the main entry points to any interaction with QLDB.
@@ -49,7 +51,7 @@ export class QldbDriver {
         if (retryLimit < 0) {
             throw new RangeError("Value for retryLimit cannot be negative.");
         }
-        qldbClientOptions.customUserAgent = `QLDB Driver for Node.js v${process.env.npm_package_version}`;
+        qldbClientOptions.customUserAgent = `QLDB Driver for Node.js v${VERSION}`;
         qldbClientOptions.maxRetries = 0;
 
         this._qldbClient = new QLDBSession(qldbClientOptions);

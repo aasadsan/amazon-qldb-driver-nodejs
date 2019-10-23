@@ -83,16 +83,15 @@ export class QldbHash {
 
     /**
      * Helper method that concatenates typed arrays.
-     * @param resultConstructor The type of the new array to create.
-     * @param arrays List of array to concatenate, in the order provided.
+     * @param arrays List of arrays to concatenate, in the order provided.
      * @returns The concatenated array.
      */
-    static _concatenate(resultConstructor, ...arrays): Uint8Array {
+    static _concatenate(...arrays: Uint8Array[]): Uint8Array {
         let totalLength = 0;
         for (const arr of arrays) {
             totalLength += arr.length;
         }
-        const result = new resultConstructor(totalLength);
+        const result = new Uint8Array(totalLength);
         let offset = 0;
         for (const arr of arrays) {
             result.set(arr, offset);
@@ -137,9 +136,9 @@ export class QldbHash {
         }
         let concatenated: Uint8Array;
         if (this._hashComparator(h1, h2) < 0) {
-            concatenated = this._concatenate(Uint8Array, h1, h2);
+            concatenated = this._concatenate(h1, h2);
         } else {
-            concatenated = this._concatenate(Uint8Array, h2, h1);
+            concatenated = this._concatenate(h2, h1);
         }
         return concatenated;
     }
