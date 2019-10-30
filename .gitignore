@@ -1,4 +1,7 @@
 .coverage
+**/*.js
+**/node_modules/*
+dev/stress_test/*.txt
 amazon-qldb-driver-nodejs/.nyc_output/*
 amazon-qldb-driver-nodejs/node_modules/*
 amazon-qldb-driver-nodejs/coverage/*
