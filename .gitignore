@@ -1,7 +1,8 @@
 .coverage
+**/*.js
+**/node_modules/*
+dev/stress_test/*.txt
 nodeqldb/.nyc_output/*
-nodeqldb/node_modules/*
 nodeqldb/coverage/*
 nodeqldb/dist/*
-nodeqldb/src/**/*.js
 package-lock.json
