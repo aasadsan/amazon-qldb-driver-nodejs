@@ -11,6 +11,9 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
 import { QLDBSession } from "aws-sdk";
 import {
     ClientConfiguration,
@@ -24,7 +27,6 @@ import {
 } from "aws-sdk/clients/qldbsession";
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
-import { IonTypes, makeBinaryWriter, Writer } from "ion-js";
 import * as sinon from "sinon";
 
 import { Communicator } from "../Communicator";
@@ -37,8 +39,10 @@ const testLedgerName: string = "fakeLedgerName";
 const testMessage: string = "foo";
 const testPageToken: PageToken = "pageToken";
 const testSessionToken: string = "sessionToken";
-const testWriter: Writer = makeBinaryWriter();
-const testParameters: Writer[] = [testWriter];
+const testValueHolder: ValueHolder = {
+    IonBinary: 'test'
+};
+const testParameters: ValueHolder[] = [testValueHolder];
 const testStatement: string = "SELECT * FROM foo";
 const testTransactionId: string = "txnId";
 const testHashToQldb: Uint8Array = new Uint8Array([1, 2, 3]);
@@ -136,14 +140,12 @@ describe("Communicator test", () => {
     it("Test executeStatement with parameters", async () => {
         const result: ExecuteStatementResult = await communicator.executeStatement(testTransactionId, testStatement,
             testParameters);
-        const ionToValueHolder = communicator["_ionToValueHolder"];
-        const sentParameters: ValueHolder[] = ionToValueHolder(testParameters);
         const testRequest: SendCommandRequest = {
             SessionToken: testSessionToken,
             ExecuteStatement: {
                 Statement: testStatement,
                 TransactionId: testTransactionId,
-                Parameters: sentParameters
+                Parameters: testParameters
             }
         };
         sinon.assert.calledTwice(sendCommandStub);
@@ -235,32 +237,6 @@ describe("Communicator test", () => {
         sinon.assert.calledTwice(sendCommandStub);
         sinon.assert.calledWith(sendCommandStub, testRequest);
         chai.assert.equal(txnId, testTransactionId);
-    });
-
-    it("Test _ionToValueHolder", () => {
-        const ionWriter: Writer = makeBinaryWriter();
-        const communicatorIonWriter: Writer = makeBinaryWriter();
-        const object = [{
-            PersonId: "123"
-        }];
-        ionWriter.stepIn(IonTypes.STRUCT);
-
-        for (const key of Object.keys(object)) {
-            ionWriter.writeFieldName(key);
-            ionWriter.writeString(object[key]);
-        }
-        communicatorIonWriter.stepIn(IonTypes.STRUCT);
-
-        for (const key of Object.keys(object)) {
-            communicatorIonWriter.writeFieldName(key);
-            communicatorIonWriter.writeString(object[key]);
-        }
-        const valueHolder = [{
-            IonBinary: ionWriter.getBytes()
-        }];
-        const ionToValueHolder = communicator["_ionToValueHolder"];
-        const communicatorValueHolder: ValueHolder[] = ionToValueHolder([communicatorIonWriter]);
-        chai.assert.equal(JSON.stringify(valueHolder), JSON.stringify(communicatorValueHolder));
     });
 
     it("Test _sendCommand", async () => {

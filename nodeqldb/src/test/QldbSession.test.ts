@@ -11,6 +11,9 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
 import { QLDBSession } from "aws-sdk";
 import {
     ClientConfiguration,
@@ -30,6 +33,7 @@ import { Communicator } from "../Communicator";
 import * as Errors from "../errors/Errors";
 import * as logUtil from "../logUtil";
 import { QldbSessionImpl } from "../QldbSessionImpl";
+import { createQldbWriter, QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
@@ -160,7 +164,6 @@ describe("QldbSession test", () => {
         chai.assert.equal(result, mockResult);
     });
 
-
     it("Test executeLambda when session closed", async () => {
         qldbSession["_isClosed"] = true;
 
@@ -277,6 +280,18 @@ describe("QldbSession test", () => {
         const result: Result = await qldbSession.executeStatement(testStatement);
         chai.assert.equal(result, mockResult);
         sinon.assert.calledOnce(executeStub);
+    });
+
+    it("Test executeStatement with parameters", async () => {
+        qldbSession.startTransaction = async () => {
+            return mockTransaction;
+        };
+
+        const mockQldbWriter = <QldbWriter><any>sandbox.mock(createQldbWriter);
+        const executeInlineSpy = sandbox.spy(mockTransaction, "executeInline");
+        const result: Result = await qldbSession.executeStatement(testStatement, [mockQldbWriter]);
+        chai.assert.equal(result, mockResult);
+        sinon.assert.calledWith(executeInlineSpy, testStatement, [mockQldbWriter]);
     });
 
     it("Test getLedgerName", () => {

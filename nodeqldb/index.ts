@@ -1,9 +1,13 @@
-export * from './src/errors/Errors'; 
-export * from './src/logUtil'; 
-export * from './src/PooledQldbDriver'; 
-export * from './src/PooledQldbSession'; 
-export * from './src/QldbDriver'; 
-export * from './src/QldbSession'; 
-export * from './src/Result';
-export * from './src/Transaction'; 
-export * from './src/TransactionExecutor'; 
+export {
+    isInvalidParameterException,
+    isOccConflictException,
+    isResourceNotFoundException,
+    isResourcePreconditionNotMetException
+} from "./src/errors/Errors";
+export { PooledQldbDriver } from "./src/PooledQldbDriver";
+export { QldbDriver } from "./src/QldbDriver";
+export { QldbSession } from "./src/QldbSession";
+export { createQldbWriter, QldbWriter } from "./src/QldbWriter";
+export { Result } from "./src/Result";
+export { Transaction } from "./src/Transaction";
+export { TransactionExecutor } from "./src/TransactionExecutor";

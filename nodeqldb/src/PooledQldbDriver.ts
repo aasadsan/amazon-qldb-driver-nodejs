@@ -12,12 +12,14 @@
  */
 
 import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
+import { globalAgent } from "http";
 import Semaphore from "semaphore-async-await";
 
 import { DriverClosedError, SessionPoolEmptyError } from "./errors/Errors";
 import { debug, info } from "./logUtil";
 import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbDriver } from "./QldbDriver";
+import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
 
 /**
@@ -70,15 +72,22 @@ export class PooledQldbDriver extends QldbDriver {
             throw new RangeError("Value for poolLimit cannot be negative.");
         }
 
+        let maxSockets: number;
+        if (qldbClientOptions.httpOptions && qldbClientOptions.httpOptions.agent) {
+            maxSockets = qldbClientOptions.httpOptions.agent.maxSockets;
+        } else {
+            maxSockets = globalAgent.maxSockets;
+        }
+
         if (0 === poolLimit) {
-            this._poolLimit = qldbClientOptions.httpOptions.agent.maxSockets;
+            this._poolLimit = maxSockets;
         } else {
             this._poolLimit = poolLimit;
         }
-        if (this._poolLimit > qldbClientOptions.httpOptions.agent.maxSockets) {
+        if (this._poolLimit > maxSockets) {
             throw new RangeError(
                 `The session pool limit given, ${this._poolLimit}, exceeds the limit set by the client,
-                 ${qldbClientOptions.httpOptions.agent.maxSockets}. Please lower the limit and retry.`
+                 ${maxSockets}. Please lower the limit and retry.`
             );
         }
 
@@ -102,11 +111,11 @@ export class PooledQldbDriver extends QldbDriver {
      * This method will attempt to retrieve an active, existing session, or it will start a new session with QLDB if
      * none are available and the session pool limit has not been reached. If the pool limit has been reached, it will
      * attempt to retrieve a session from the pool until the timeout is reached.
-     * @returns Promise which fulfills with a PooledQldbSession.
+     * @returns Promise which fulfills with a QldbSession.
      * @throws {@linkcode DriverClosedError} when this driver is closed.
      * @throws {@linkcode SessionPoolEmptyError} if the timeout is reached while attempting to retrieve a session.
      */
-    async getSession(): Promise<PooledQldbSession> {
+    async getSession(): Promise<QldbSession> {
         if (this._isClosed) {
             throw new DriverClosedError();
         }

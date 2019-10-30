@@ -9,8 +9,9 @@
   },
   "name": "qldb-node-client",
   "description": "A Node.js client for working with Quantum Ledger Database",
-  "version": "0.1.0",
-  "main": "src/index.ts",
+  "version": "0.1.0-beta.1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "devDependencies": {
     "@types/chai": "^4.2.3",
     "@types/chai-as-promised": "^7.1.2",
@@ -30,8 +31,8 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "test": "mocha -r ts-node/register src/**/*.test.ts",
-    "testWithCoverage": "nyc -r lcov -e .ts -x \"*.test.ts\" mocha -r ts-node/register src/**/*.test.ts && nyc report",
+    "test": "set TS_NODE_COMPILER_OPTIONS={\"strict\":false} && mocha -r ts-node/register src/**/*.test.ts",
+    "testWithCoverage": " set TS_NODE_COMPILER_OPTIONS={\"strict\":false} && nyc -r lcov -e .ts -x \"*.test.ts\" mocha -r ts-node/register src/**/*.test.ts && nyc report",
     "lint": "eslint src/**/*.ts"
   },
   "author": {

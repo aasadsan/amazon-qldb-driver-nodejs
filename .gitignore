@@ -1,7 +1,7 @@
 .coverage
-**/node_modules/*
-**/out/*
 nodeqldb/.nyc_output/*
+nodeqldb/node_modules/*
 nodeqldb/coverage/*
+nodeqldb/dist/*
 nodeqldb/src/**/*.js
 package-lock.json

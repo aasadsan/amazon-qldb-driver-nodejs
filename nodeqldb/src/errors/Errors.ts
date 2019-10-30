@@ -11,6 +11,8 @@
  * and limitations under the License.
  */
 
+import { AWSError } from "aws-sdk";
+
 import { error } from "../logUtil";
 
 class ClientException extends Error {
@@ -86,7 +88,7 @@ class TransactionClosedError extends Error {
  * @param e The client error caught.
  * @returns True if the exception is an InvalidParameterException. False otherwise.
  */
-function isInvalidParameterException(e): boolean {
+function isInvalidParameterException(e: AWSError): boolean {
     return e.code === "InvalidParameterException";
 }
 
@@ -95,7 +97,7 @@ function isInvalidParameterException(e): boolean {
  * @param e The client error caught.
  * @returns True if the exception is an InvalidSessionException. False otherwise.
  */
-function isInvalidSessionException(e): boolean {
+function isInvalidSessionException(e: AWSError): boolean {
     return e.code === "InvalidSessionException";
 }
 
@@ -104,7 +106,7 @@ function isInvalidSessionException(e): boolean {
  * @param e The client error caught.
  * @returns True if the exception is an OccConflictException. False otherwise.
  */
-function isOccConflictException(e): boolean {
+function isOccConflictException(e: AWSError): boolean {
     return e.code === "OccConflictException";
 }
 
@@ -113,7 +115,7 @@ function isOccConflictException(e): boolean {
  * @param e The client error to check to see if it is a ResourceNotFoundException.
  * @returns Whether or not the exception is a ResourceNotFoundException.
  */
-function isResourceNotFoundException(e): boolean {
+function isResourceNotFoundException(e: AWSError): boolean {
     return e.code === "ResourceNotFoundException";
 }
 
@@ -122,7 +124,7 @@ function isResourceNotFoundException(e): boolean {
  * @param e The client error to check to see if it is a ResourcePreconditionNotMetException.
  * @returns Whether or not the exception is a ResourcePreconditionNotMetException.
  */
-function isResourcePreconditionNotMetException(e): boolean {
+function isResourcePreconditionNotMetException(e: AWSError): boolean {
     return e.code === "ResourcePreconditionNotMetException";
 }
 
@@ -131,7 +133,7 @@ function isResourcePreconditionNotMetException(e): boolean {
  * @param e The client error caught.
  * @returns True if the exception is a retriable exception. False otherwise.
  */
-function isRetriableException(e): boolean {
+function isRetriableException(e: AWSError): boolean {
     return (e.statusCode === 500) ||
            (e.statusCode === 503) ||
            (e.code === "NoHttpResponseException") ||

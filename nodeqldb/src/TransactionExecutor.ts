@@ -11,11 +11,11 @@
  * and limitations under the License.
  */
 
-import { Writer } from "ion-js";
+import { Readable } from "stream";
 
 import { LambdaAbortedError } from "./errors/Errors";
+import { QldbWriter } from "./QldbWriter";
 import { Result } from "./Result";
-import { ResultStream } from "./ResultStream";
 import { Transaction } from "./Transaction";
 
 /**
@@ -41,30 +41,25 @@ export class TransactionExecutor {
     }
 
     /**
-     * Clear the registered parameters for this transaction.
-     */
-    clearParameters(): void {
-        this._transaction.clearParameters();
-    }
-
-    /**
      * Execute the specified statement in the current transaction.
      * @param statement The statement to execute.
+     * @param parameters An optional list of QLDB writers containing Ion values to execute.
      * @returns Promise which fulfills with a Result.
      * @throws {@linkcode TransactionClosedError} when the transaction is closed.
      */
-    async executeInline(statement: string): Promise<Result> {
-        return await this._transaction.executeInline(statement);
+    async executeInline(statement: string, parameters: QldbWriter[] = []): Promise<Result> {
+        return await this._transaction.executeInline(statement, parameters);
     }
 
     /**
      * Execute the specified statement in the current transaction.
      * @param statement The statement to execute.
+     * @param parameters An optional list of QLDB writers containing Ion values to execute.
      * @returns Promise which fulfills with a ResultStream.
      * @throws {@linkcode TransactionClosedError} when the transaction is closed.
      */
-    async executeStream(statement: string): Promise<ResultStream> {
-        return await this._transaction.executeStream(statement);
+    async executeStream(statement: string, parameters: QldbWriter[] = []): Promise<Readable> {
+        return await this._transaction.executeStream(statement, parameters);
     }
 
     /**
@@ -73,23 +68,5 @@ export class TransactionExecutor {
     */
     getTransactionId(): string {
         return this._transaction.getTransactionId();
-    }
-
-    /**
-     * Create a writer for a parameter.
-     *
-     * Each transaction tracks the registered parameters to be used for the next execution. When the next execution
-     * occurs, the parameters are used and then cleared. Parameters must then be registered for the next execution.
-     *
-     * Registering a parameter that has already been registered will clear the previously registered writer for that
-     * parameter.
-     *
-     * @param paramNumber Represents the i-th parameter we're registering for the next execution in the transaction.
-     *                    paramNumber is a 1-based counter.
-     * @returns Binary writer for the parameter.
-     * @throws {@linkcode ClientException} when the parameter number is less than 1.
-     */
-    registerParameter(paramNumber: number): Writer {
-        return this._transaction.registerParameter(paramNumber);
     }
 }

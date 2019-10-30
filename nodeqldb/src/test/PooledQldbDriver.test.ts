@@ -11,6 +11,9 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
 import { QLDBSession } from "aws-sdk";
 import { ClientConfiguration, SendCommandResult } from "aws-sdk/clients/qldbsession";
 import * as chai from "chai";
@@ -21,10 +24,10 @@ import * as sinon from "sinon";
 
 import { DriverClosedError, SessionPoolEmptyError } from "../errors/Errors";
 import * as logUtil from "../logUtil";
+import { PooledQldbDriver } from "../PooledQldbDriver";
 import { QldbDriver } from "../QldbDriver";
 import { QldbSessionImpl } from "../QldbSessionImpl";
-import { PooledQldbDriver } from "../PooledQldbDriver";
-import { PooledQldbSession } from "../PooledQldbSession";
+import { QldbSession } from "../QldbSession";
 
 chai.use(chaiAsPromised);
 const sandbox = sinon.createSandbox();
@@ -101,9 +104,8 @@ describe("PooledQldbDriver test", () => {
     });
 
     it("Test constructor with poolLimit greater than maxSockets", () => {
-        mockAgent.maxSockets = 1;
         const constructorFunction: Function = () => {
-            new PooledQldbDriver(testLowLevelClientOptions, testLedgerName, 4, 2);
+            new PooledQldbDriver(testLowLevelClientOptions, testLedgerName, 4, testMaxSockets + 1);
         };
         chai.assert.throws(constructorFunction, RangeError);
     });
@@ -147,7 +149,7 @@ describe("PooledQldbDriver test", () => {
         const qldbDriverGetSessionSpy = sandbox.spy(QldbDriver.prototype, "getSession");
         const logInfoSpy = sandbox.spy(logUtil, "info");
 
-        const pooledQldbSession: PooledQldbSession = await pooledQldbDriver.getSession();
+        const pooledQldbSession: QldbSession = await pooledQldbDriver.getSession();
 
         sinon.assert.calledOnce(qldbDriverGetSessionSpy);
         sinon.assert.calledOnce(semaphoreStub);
@@ -174,7 +176,7 @@ describe("PooledQldbDriver test", () => {
         const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
         semaphoreStub.returns(Promise.resolve(true));
 
-        const pooledQldbSession: PooledQldbSession = await pooledQldbDriver.getSession();
+        const pooledQldbSession: QldbSession = await pooledQldbDriver.getSession();
 
         sinon.assert.calledOnce(logInfoSpy);
         sinon.assert.calledOnce(abortOrCloseSpy);

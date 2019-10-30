@@ -11,6 +11,9 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
 import { IonBinary, Page, ValueHolder} from "aws-sdk/clients/qldbsession";
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";

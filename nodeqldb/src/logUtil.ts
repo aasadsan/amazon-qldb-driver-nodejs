@@ -13,11 +13,13 @@
 
 import { config } from "aws-sdk";
 
+import { version } from "../package.json";
+
 /**
  * Logs a debug level message.
  * @param line The message to be logged.
  */
-export function debug(line: any): void {
+export function debug(line: string): void {
     if (isLoggerSet()) {
         _prepend(line, "DEBUG");
     }
@@ -27,7 +29,7 @@ export function debug(line: any): void {
  * Logs an error level message.
  * @param line The message to be logged.
  */
-export function error(line: any): void {
+export function error(line: string): void {
     if (isLoggerSet()) {
         _prepend(line, "ERROR");
     }
@@ -37,7 +39,7 @@ export function error(line: any): void {
  * Logs an info level message.
  * @param line The message to be logged.
  */
-export function info(line: any): void {
+export function info(line: string): void {
     if (isLoggerSet()) {
         _prepend(line, "INFO");
     }
@@ -54,7 +56,7 @@ export function isLoggerSet(): boolean {
  * Logs a message.
  * @param line The message to be logged.
  */
-export function log(line: any): void {
+export function log(line: string): void {
     if (isLoggerSet()) {
         _prepend(line, "LOG");
     }
@@ -64,7 +66,7 @@ export function log(line: any): void {
  * Logs a warning level message.
  * @param line The message to be logged.
  */
-export function warn(line: any): void {
+export function warn(line: string): void {
     if (isLoggerSet()) {
         _prepend(line, "WARN");
     }
@@ -77,11 +79,11 @@ export function warn(line: any): void {
  * @param level The log level.
  */
 function _prepend(line: any, level: string): void {
-    if (typeof config.logger.log === "function") {
-        config.logger.log(`[${level}][Javascript QLDB Driver, Version: ${process.env.npm_package_version}] ${line}`);
-    } else if (typeof config.logger.write === "function") {
-        config.logger.write(
-            `[${level}][Javascript QLDB Driver, Version: ${process.env.npm_package_version}] ${line}\n`
-        );
+    if (config.logger) {
+        if (typeof config.logger.log === "function") {
+            config.logger.log(`[${level}][Javascript QLDB Driver, Version: ${version}] ${line}`);
+        } else if (typeof config.logger.write === "function") {
+            config.logger.write(`[${level}][Javascript QLDB Driver, Version: ${version}] ${line}\n`);
+        }
     }
 }

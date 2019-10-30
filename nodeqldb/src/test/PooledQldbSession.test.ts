@@ -11,6 +11,9 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import * as sinon from "sinon";
@@ -19,6 +22,7 @@ import * as logUtil from "../logUtil";
 import { SessionClosedError } from "../errors/Errors";
 import { PooledQldbSession } from "../PooledQldbSession";
 import { QldbSessionImpl } from "../QldbSessionImpl";
+import { createQldbWriter, QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
 import { Transaction } from "../Transaction";
 
@@ -119,6 +123,15 @@ describe("PooledQldbSession test", () => {
         const result: Result = await pooledQldbSession.executeStatement(testStatement);
         chai.assert.equal(result, mockResult);
         sinon.assert.calledOnce(executeSpy);
+    });
+
+    it("Test executeStatement with parameters", async () => {
+        const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
+        const mockQldbWriter = <QldbWriter><any> sandbox.mock(createQldbWriter);
+        const result: Result = await pooledQldbSession.executeStatement(testStatement, [mockQldbWriter]);
+        chai.assert.equal(result, mockResult);
+        sinon.assert.calledOnce(executeSpy);
+        sinon.assert.calledWith(executeSpy, testStatement, [mockQldbWriter]);
     });
 
     it("Test executeStatement when closed", async () => {

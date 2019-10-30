@@ -11,6 +11,9 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
 import { QLDBSession } from "aws-sdk";
 import { ClientConfiguration, SendCommandResult } from "aws-sdk/clients/qldbsession";
 import * as chai from "chai";

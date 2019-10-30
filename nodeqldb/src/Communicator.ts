@@ -22,7 +22,6 @@ import {
     SendCommandResult,
     ValueHolder,
 } from "aws-sdk/clients/qldbsession";
-import { Writer } from "ion-js";
 import { inspect } from "util";
 
 import { debug, warn } from "./logUtil";
@@ -98,17 +97,20 @@ export class Communicator {
      * Send an execute statement request with parameters to QLDB.
      * @param txnId The ID of the transaction.
      * @param statement The statement to execute.
-     * @param parameters The parameters of the statement contained in Writers.
+     * @param parameters The parameters of the statement contained in ValueHolders.
      * @returns Promise which fulfills with the execute statement response returned from QLDB.
      */
-    async executeStatement(txnId: string, statement: string, parameters: Writer[]): Promise<ExecuteStatementResult> {
-        const valueHolder: ValueHolder[] = this._ionToValueHolder(parameters);
+    async executeStatement(
+        txnId: string,
+        statement: string,
+        parameters: ValueHolder[]
+    ): Promise<ExecuteStatementResult> {
         const request: SendCommandRequest = {
             SessionToken: this._sessionToken,
             ExecuteStatement: {
                 Statement: statement,
                 TransactionId: txnId,
-                Parameters: valueHolder
+                Parameters: parameters
             }
         };
         const result: SendCommandResult = await this._sendCommand(request);
@@ -185,23 +187,6 @@ export class Communicator {
         };
         const result: SendCommandResult = await this._sendCommand(request);
         return result.StartTransaction.TransactionId;
-    }
-
-    /**
-     * Convert the given list of parameters into an array of ValueHolders.
-     * @param parameters List of binary writers for a given query.
-     * @returns The parameters converted to array of ValueHolders.
-     */
-    private _ionToValueHolder(parameters: Writer[]): ValueHolder[] {
-        const valueHolderList: ValueHolder[] = [];
-        parameters.forEach((writer: Writer) => {
-            const byteBuffer: Uint8Array = writer.getBytes();
-            const valueHolder: ValueHolder = {
-                IonBinary: byteBuffer
-            };
-            valueHolderList.push(valueHolder);
-        });
-        return valueHolderList;
     }
 
     /**

@@ -11,7 +11,8 @@
  * and limitations under the License.
  */
 
-import { IonTypes } from "ion-js";
+import { IonTypes, Reader } from "ion-js";
+import { Readable } from "stream";
 
 import { Communicator } from "./Communicator";
 import {
@@ -24,6 +25,7 @@ import {
 } from "./errors/Errors";
 import { info, warn } from "./logUtil";
 import { QldbSession } from "./QldbSession";
+import { QldbWriter } from "./QldbWriter";
 import { Result } from "./Result";
 import { ResultStream } from "./ResultStream";
 import { Transaction } from "./Transaction";
@@ -141,14 +143,19 @@ export class QldbSessionImpl implements QldbSession {
      * retry limit if an OCC conflict or retriable exception occurs.
      *
      * @param statement The statement to execute.
+     * @param parameters An optional list of QLDB writers containing Ion values to execute.
      * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an
      *                       OCC conflict or retriable exception.
      * @returns Promise which fulfills with a Result.
      * @throws {@linkcode SessionClosedError} when this session is closed.
      */
-    async executeStatement(statement: string, retryIndicator?: (retryAttempt: number) => void): Promise<Result> {
+    async executeStatement(
+        statement: string,
+        parameters: QldbWriter[] = [],
+        retryIndicator?: (retryAttempt: number) => void
+    ): Promise<Result> {
         return await this.executeLambda(async (txn) => {
-            return await txn.executeInline(statement);
+            return await txn.executeInline(statement, parameters);
         }, retryIndicator);
     }
 
@@ -175,7 +182,7 @@ export class QldbSessionImpl implements QldbSession {
     async getTableNames(): Promise<string[]> {
         const statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
         return await this.executeLambda(async (transactionExecutor) => {
-            const result: ResultStream = await transactionExecutor.executeStream(statement);
+            const result: Readable = await transactionExecutor.executeStream(statement);
             return await this._tableNameHelper(result);
         });
     }
@@ -252,10 +259,10 @@ export class QldbSessionImpl implements QldbSession {
      * @returns Promise which fulfills with an array of table names or rejects with a {@linkcode ClientException}
      * when the reader does not contain a struct or if the value within the struct is not of type string.
      */
-    private _tableNameHelper(resultStream: ResultStream): Promise<string[]> {
+    private _tableNameHelper(resultStream: Readable): Promise<string[]> {
         return new Promise((res, rej) => {
             const listOfStrings: string[] = [];
-            resultStream.on("data", function(reader) {
+            resultStream.on("data", function(reader: Reader) {
                 let type: any = reader.next();
                 if (type.binaryTypeId !== IonTypes.STRUCT.binaryTypeId) {
                     return rej(new ClientException(

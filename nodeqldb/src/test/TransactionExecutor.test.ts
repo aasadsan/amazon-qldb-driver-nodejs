@@ -11,11 +11,15 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
 import { makeBinaryWriter, Writer } from "ion-js";
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import * as sinon from "sinon";
 
+import { createQldbWriter, QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
@@ -52,13 +56,6 @@ describe("TransactionExecutor test", () => {
         }).to.throw();
     });
 
-    it("Test clearParameters", () => {
-        mockTransaction.clearParameters = () => {};
-        const transactionClearSpy = sandbox.spy(mockTransaction, "clearParameters");
-        transactionExecutor.clearParameters();
-        sinon.assert.calledOnce(transactionClearSpy);
-    });
-
     it("Test executeInline", async () => {
         mockTransaction.executeInline = async () => {
             return mockResult;
@@ -68,6 +65,19 @@ describe("TransactionExecutor test", () => {
         chai.assert.equal(mockResult, result);
         sinon.assert.calledOnce(transactionExecuteSpy);
         sinon.assert.calledWith(transactionExecuteSpy, testStatement);
+    });
+
+    it("Test executeInline with parameters", async () => {
+        mockTransaction.executeInline = async () => {
+            return mockResult;
+        };
+        const qldbWriter: QldbWriter = createQldbWriter();
+
+        const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
+        const result = await transactionExecutor.executeInline(testStatement, [qldbWriter]);
+        chai.assert.equal(mockResult, result);
+        sinon.assert.calledOnce(transactionExecuteSpy);
+        sinon.assert.calledWith(transactionExecuteSpy, testStatement, [qldbWriter]);
     });
 
     it("Test executeInline with exception", async () => {
@@ -92,6 +102,20 @@ describe("TransactionExecutor test", () => {
         sinon.assert.calledWith(transactionExecuteSpy, testStatement);
     });
 
+    it("Test executeStream with parameters", async () => {
+        mockTransaction.executeStream = async () => {
+            return mockResultStream;
+        };
+
+        const qldbWriter: QldbWriter = createQldbWriter();
+
+        const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
+        const resultStream = await transactionExecutor.executeStream(testStatement, [qldbWriter]);
+        chai.assert.equal(mockResultStream, resultStream);
+        sinon.assert.calledOnce(transactionExecuteSpy);
+        sinon.assert.calledWith(transactionExecuteSpy, testStatement, [qldbWriter]);
+    });
+
     it("Test executeStream with exception", async () => {
         mockTransaction.executeStream = async () => {
             throw new Error(testMessage);
@@ -111,16 +135,5 @@ describe("TransactionExecutor test", () => {
         const transactionId = transactionExecutor.getTransactionId();
         chai.assert.equal(transactionId, testTransactionId);
         sinon.assert.calledOnce(transactionIdSpy);
-    });
-
-    it("Test registerParameter", async () => {
-        mockTransaction.registerParameter = () => {
-            return testWriter;
-        };
-        const registerParamSpy = sandbox.spy(mockTransaction, "registerParameter");
-        const writer = transactionExecutor.registerParameter(1);
-        chai.assert.equal(writer, testWriter);
-        sinon.assert.calledOnce(registerParamSpy);
-        sinon.assert.calledWith(registerParamSpy, 1);
     });
 });

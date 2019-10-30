@@ -82,7 +82,7 @@ export class QldbHash {
     }
 
     /**
-     * Helper method that concatenates typed arrays.
+     * Helper method that concatenates two Uint8Array.
      * @param arrays List of arrays to concatenate, in the order provided.
      * @returns The concatenated array.
      */

@@ -11,6 +11,10 @@
  * and limitations under the License.
  */
 
+// Test environment imports
+import "mocha";
+
+import { AWSError } from "aws-sdk";
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import * as sinon from "sinon";
@@ -35,10 +39,13 @@ chai.use(chaiAsPromised);
 const sandbox = sinon.createSandbox();
 
 const testMessage: string = "foo";
+const mockError: AWSError = <AWSError><any> sandbox.mock(AWSError);
 
 describe("Errors test", () => {
 
     afterEach(() => {
+        mockError.code = undefined;
+        mockError.statusCode = undefined;
         sandbox.restore();
     });
 
@@ -86,77 +93,82 @@ describe("Errors test", () => {
     });
 
     it("Test isInvalidParameterException true", () => {
-        const mockError = {code: "InvalidParameterException"};
+        mockError.code = "InvalidParameterException";
         chai.assert.isTrue(isInvalidParameterException(mockError));
     });
 
     it("Test isInvalidParameterException false", () => {
-        const mockError = {code: "NotInvalidParameterException"};
+        mockError.code = "NotInvalidParameterException";
         chai.assert.isFalse(isInvalidParameterException(mockError));
     });
 
     it("Test isInvalidSessionException true", () => {
-        const mockError = {code: "InvalidSessionException"};
+        mockError.code = "InvalidSessionException";
         chai.assert.isTrue(isInvalidSessionException(mockError));
     });
 
     it("Test isInvalidSessionException false", () => {
-        const mockError = {code: "NotInvalidSessionException"};
+        mockError.code = "NotInvalidSessionException";
         chai.assert.isFalse(isInvalidSessionException(mockError));
     });
 
     it("Test isOccConflictException true", () => {
-        const mockError = {code: "OccConflictException"};
+        mockError.code = "OccConflictException";
         chai.assert.isTrue(isOccConflictException(mockError));
     });
 
     it("Test isOccConflictException false", () => {
-        const mockError = {code: "NotOccConflictException"};
+        mockError.code = "NotOccConflictException";
         chai.assert.isFalse(isOccConflictException(mockError));
     });
 
     it("Test isResourceNotFoundException true", () => {
-        const mockError = {code: "ResourceNotFoundException"};
+        mockError.code = "ResourceNotFoundException";
         chai.assert.isTrue(isResourceNotFoundException(mockError));
     });
 
     it("Test isResourceNotFoundException false", () => {
-        const mockError = {code: "NotResourceNotFoundException"};
+        mockError.code = "NotResourceNotFoundException";
         chai.assert.isFalse(isResourceNotFoundException(mockError));
     });
 
     it("Test isResourcePreconditionNotMetException true", () => {
-        const mockError = {code: "ResourcePreconditionNotMetException"};
+        mockError.code = "ResourcePreconditionNotMetException";
         chai.assert.isTrue(isResourcePreconditionNotMetException(mockError));
     });
 
     it("Test isResourcePreconditionNotMetException false", () => {
-        const mockError = {code: "NotResourcePreconditionNotMetException"};
+        mockError.code = "NotResourcePreconditionNotMetException";
         chai.assert.isFalse(isResourcePreconditionNotMetException(mockError));
     });
 
     it("Test isRetriableException with statusCode 500", () => {
-        const mockError = {statusCode: 500, code: "NotRetriableException"};
+        mockError.code = "NotRetriableException";
+        mockError.statusCode = 500;
         chai.assert.isTrue(isRetriableException(mockError));
     });
 
     it("Test isRetriableException with statusCode 503", () => {
-        const mockError = {statusCode: 503, code: "NotRetriableException"};
+        mockError.code = "NotRetriableException";
+        mockError.statusCode = 503;
         chai.assert.isTrue(isRetriableException(mockError));
     });
 
     it("Test isRetriableException with code NoHttpResponseException", () => {
-        const mockError = {code: "NoHttpResponseException", statusCode: 200};
+        mockError.code = "NoHttpResponseException";
+        mockError.statusCode = 200;
         chai.assert.isTrue(isRetriableException(mockError));
     });
 
     it("Test isRetriableException with code SocketTimeoutException", () => {
-        const mockError = {code: "SocketTimeoutException", statusCode: 200};
+        mockError.code = "SocketTimeoutException";
+        mockError.statusCode = 200;
         chai.assert.isTrue(isRetriableException(mockError));
     });
 
     it("Test isRetriableException false", () => {
-        const mockError = {code: "NotRetriableException", statusCode: 200};
+        mockError.code = "NotRetriableException";
+        mockError.statusCode = 200;
         chai.assert.isFalse(isRetriableException(mockError));
     });
 });
