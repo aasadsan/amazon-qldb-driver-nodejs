@@ -49,7 +49,7 @@ mockCommunicator.fetchPage = async () => {
 
 let resultStream: ResultStream;
 
-describe("ResultStream test", () => {
+describe("ResultStream", () => {
 
     beforeEach(() => {
         resultStream = new ResultStream(testTransactionId, testPageWithToken, mockCommunicator);
@@ -59,159 +59,167 @@ describe("ResultStream test", () => {
         sandbox.restore();
     });
 
-    it("Test constructor", () => {
-        chai.assert.equal(mockCommunicator, resultStream["_communicator"]);
-        chai.assert.equal(testPageWithToken, resultStream["_cachedPage"]);
-        chai.assert.equal(testTransactionId, resultStream["_txnId"]);
-        chai.assert.isTrue(resultStream["_shouldPushCachedPage"]);
-        chai.assert.equal(0, resultStream["_lastRetrievedIndex"]);
-        chai.assert.isFalse(resultStream["_isClosed"]);
-        chai.expect(resultStream["_lock"]).to.be.an.instanceOf(Lock);
+    describe("#constructor()", () => {
+        it("should have all attributes equal to mock values when constructor called", () => {
+            chai.assert.equal(mockCommunicator, resultStream["_communicator"]);
+            chai.assert.equal(testPageWithToken, resultStream["_cachedPage"]);
+            chai.assert.equal(testTransactionId, resultStream["_txnId"]);
+            chai.assert.isTrue(resultStream["_shouldPushCachedPage"]);
+            chai.assert.equal(0, resultStream["_lastRetrievedIndex"]);
+            chai.assert.isFalse(resultStream["_isClosed"]);
+            chai.expect(resultStream["_lock"]).to.be.an.instanceOf(Lock);
+        });
     });
 
-    it("Test close", () => {
-        chai.assert.isFalse(resultStream["_isClosed"]);
+    describe("#close()", () => {
+        it("should close resultStream when called", () => {
+            chai.assert.isFalse(resultStream["_isClosed"]);
 
-        resultStream.close();
-        chai.assert.isTrue(resultStream["_isClosed"]);
+            resultStream.close();
+            chai.assert.isTrue(resultStream["_isClosed"]);
+        });
     });
 
-    it("Test _read when not closed", () => {
-        resultStream["_pushPageValues"] = async (): Promise<void> => {
-            return;
-        }
-        const _pushPageValuesSpy = sandbox.spy(resultStream as any, "_pushPageValues");
-        resultStream._read();
-        sinon.assert.calledOnce(_pushPageValuesSpy);
-    });
-
-    it("Test _read when closed", () => {
-        let caughtError: Error;
-        resultStream.close();
-        const _pushPageValuesSpy = sandbox.spy(resultStream as any, "_pushPageValues");
-
-        try {
+    describe("#_read()", () => {
+        it("should call _pushPageValues() when called", () => {
+            resultStream["_pushPageValues"] = async (): Promise<void> => {
+                return;
+            }
+            const _pushPageValuesSpy = sandbox.spy(resultStream as any, "_pushPageValues");
             resultStream._read();
-        } catch (e) {
-            caughtError = e;
-        } finally {
-            chai.expect(caughtError).to.be.an.instanceOf(ClientException);
-            sinon.assert.notCalled(_pushPageValuesSpy);
-        }
+            sinon.assert.calledOnce(_pushPageValuesSpy);
+        });
+
+        it("should throw ClientException when closed", () => {
+            let caughtError: Error;
+            resultStream.close();
+            const _pushPageValuesSpy = sandbox.spy(resultStream as any, "_pushPageValues");
+
+            try {
+                resultStream._read();
+            } catch (e) {
+                caughtError = e;
+            } finally {
+                chai.expect(caughtError).to.be.an.instanceOf(ClientException);
+                sinon.assert.notCalled(_pushPageValuesSpy);
+            }
+        });
     });
 
-    it("Test _pushPageValues when _shouldPushCachedPage and fully pushes and has next token", async () => {
-        const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
-        const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
-        const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
-        sandbox.stub(Result, "_handleBlob");
-        const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
-        makeReaderStub.onCall(0).returns(1);
-        makeReaderStub.onCall(1).returns(2);
-        makeReaderStub.returns(3);
-        const pushStub = sandbox.stub(resultStream, "push");
-        pushStub.returns(true);
+    describe("#_pushPageValues()", () => {
+        it("should fully push all pages when _shouldPushCachedPage is true and next token exists", async () => {
+            const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
+            const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
+            const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
+            sandbox.stub(Result, "_handleBlob");
+            const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
+            makeReaderStub.onCall(0).returns(1);
+            makeReaderStub.onCall(1).returns(2);
+            makeReaderStub.returns(3);
+            const pushStub = sandbox.stub(resultStream, "push");
+            pushStub.returns(true);
 
-        await resultStream["_pushPageValues"]();
+            await resultStream["_pushPageValues"]();
 
-        sinon.assert.notCalled(fetchPageSpy);
-        sinon.assert.calledThrice(pushStub);
-        sinon.assert.calledWith(pushStub.getCall(0), 1);
-        sinon.assert.calledWith(pushStub.getCall(1), 2);
-        sinon.assert.calledWith(pushStub.getCall(2), 3);
-        sinon.assert.calledOnce(_lockAcquireSpy);
-        sinon.assert.calledOnce(_lockReleaseSpy);
-        chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
-        chai.assert.isFalse(resultStream["_isClosed"]);
-    });
+            sinon.assert.notCalled(fetchPageSpy);
+            sinon.assert.calledThrice(pushStub);
+            sinon.assert.calledWith(pushStub.getCall(0), 1);
+            sinon.assert.calledWith(pushStub.getCall(1), 2);
+            sinon.assert.calledWith(pushStub.getCall(2), 3);
+            sinon.assert.calledOnce(_lockAcquireSpy);
+            sinon.assert.calledOnce(_lockReleaseSpy);
+            chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
+            chai.assert.isFalse(resultStream["_isClosed"]);
+        });
 
-    it("Test _pushPageValues when _shouldPushCachedPage and fully pushes and not has next token", async () => {
-        resultStream["_cachedPage"] = testPage;
-        const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
-        const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
-        const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
-        sandbox.stub(Result, "_handleBlob");
-        const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
-        makeReaderStub.onCall(0).returns(1);
-        makeReaderStub.onCall(1).returns(2);
-        makeReaderStub.returns(3);
-        const pushStub = sandbox.stub(resultStream, "push");
-        pushStub.returns(true);
+        it("should fully push all pages when _shouldPushCachedPage is true and next token does not exist", async () => {
+            resultStream["_cachedPage"] = testPage;
+            const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
+            const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
+            const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
+            sandbox.stub(Result, "_handleBlob");
+            const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
+            makeReaderStub.onCall(0).returns(1);
+            makeReaderStub.onCall(1).returns(2);
+            makeReaderStub.returns(3);
+            const pushStub = sandbox.stub(resultStream, "push");
+            pushStub.returns(true);
 
-        await resultStream["_pushPageValues"]();
+            await resultStream["_pushPageValues"]();
 
-        sinon.assert.notCalled(fetchPageSpy);
-        chai.assert.equal(pushStub.callCount, 4);
-        sinon.assert.calledWith(pushStub.getCall(0), 1);
-        sinon.assert.calledWith(pushStub.getCall(1), 2);
-        sinon.assert.calledWith(pushStub.getCall(2), 3);
-        sinon.assert.calledWith(pushStub.getCall(3), null);
-        sinon.assert.calledOnce(_lockAcquireSpy);
-        sinon.assert.calledOnce(_lockReleaseSpy);
-        chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
-        chai.assert.isTrue(resultStream["_isClosed"]);
-    });
+            sinon.assert.notCalled(fetchPageSpy);
+            chai.assert.equal(pushStub.callCount, 4);
+            sinon.assert.calledWith(pushStub.getCall(0), 1);
+            sinon.assert.calledWith(pushStub.getCall(1), 2);
+            sinon.assert.calledWith(pushStub.getCall(2), 3);
+            sinon.assert.calledWith(pushStub.getCall(3), null);
+            sinon.assert.calledOnce(_lockAcquireSpy);
+            sinon.assert.calledOnce(_lockReleaseSpy);
+            chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
+            chai.assert.isTrue(resultStream["_isClosed"]);
+        });
 
-    it("Test _pushPageValues when not _shouldPushCachedPage", async () => {
-        resultStream["_shouldPushCachedPage"] = false;
-        const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
-        const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
-        const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
-        sandbox.stub(Result, "_handleBlob");
-        const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
-        makeReaderStub.onCall(0).returns(1);
-        makeReaderStub.onCall(1).returns(2);
-        makeReaderStub.returns(3);
-        const pushStub = sandbox.stub(resultStream, "push");
-        pushStub.returns(true);
+        it("should fully push relevant pages when _shouldPushCachedPage is false and next token exists", async () => {
+            resultStream["_shouldPushCachedPage"] = false;
+            const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
+            const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
+            const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
+            sandbox.stub(Result, "_handleBlob");
+            const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
+            makeReaderStub.onCall(0).returns(1);
+            makeReaderStub.onCall(1).returns(2);
+            makeReaderStub.returns(3);
+            const pushStub = sandbox.stub(resultStream, "push");
+            pushStub.returns(true);
 
-        await resultStream["_pushPageValues"]();
+            await resultStream["_pushPageValues"]();
 
-        sinon.assert.called(fetchPageSpy);
-        chai.assert.equal(pushStub.callCount, 4);
-        sinon.assert.calledWith(pushStub.getCall(0), 1);
-        sinon.assert.calledWith(pushStub.getCall(1), 2);
-        sinon.assert.calledWith(pushStub.getCall(2), 3);
-        sinon.assert.calledWith(pushStub.getCall(3), null);
-        sinon.assert.calledOnce(_lockAcquireSpy);
-        sinon.assert.calledOnce(_lockReleaseSpy);
-        chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
-        chai.assert.isTrue(resultStream["_isClosed"]);
-    });
+            sinon.assert.called(fetchPageSpy);
+            chai.assert.equal(pushStub.callCount, 4);
+            sinon.assert.calledWith(pushStub.getCall(0), 1);
+            sinon.assert.calledWith(pushStub.getCall(1), 2);
+            sinon.assert.calledWith(pushStub.getCall(2), 3);
+            sinon.assert.calledWith(pushStub.getCall(3), null);
+            sinon.assert.calledOnce(_lockAcquireSpy);
+            sinon.assert.calledOnce(_lockReleaseSpy);
+            chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
+            chai.assert.isTrue(resultStream["_isClosed"]);
+        });
 
-    it("Test _pushPageValues when not fully pushes", async () => {
-        const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
-        const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
-        const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
-        sandbox.stub(Result, "_handleBlob");
-        const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
-        makeReaderStub.onCall(0).returns(1);
-        makeReaderStub.onCall(1).returns(2);
-        makeReaderStub.onCall(2).returns(3);
-        makeReaderStub.returns(4);
-        const pushStub = sandbox.stub(resultStream, "push");
-        pushStub.onCall(0).returns(true);
-        pushStub.onCall(1).returns(false);
-        pushStub.returns(true);
+        it("should push cached page and rest of the pages when previous push failed", async () => {
+            const _lockAcquireSpy = sandbox.spy(resultStream["_lock"] as any, "acquire");
+            const _lockReleaseSpy = sandbox.spy(resultStream["_lock"] as any, "release");
+            const fetchPageSpy = sandbox.spy(mockCommunicator, "fetchPage");
+            sandbox.stub(Result, "_handleBlob");
+            const makeReaderStub = sandbox.stub(ionJs as any, "makeReader");
+            makeReaderStub.onCall(0).returns(1);
+            makeReaderStub.onCall(1).returns(2);
+            makeReaderStub.onCall(2).returns(3);
+            makeReaderStub.returns(4);
+            const pushStub = sandbox.stub(resultStream, "push");
+            pushStub.onCall(0).returns(true);
+            pushStub.onCall(1).returns(false);
+            pushStub.returns(true);
 
-        await resultStream["_pushPageValues"]();
+            await resultStream["_pushPageValues"]();
 
-        sinon.assert.calledTwice(makeReaderStub);
-        sinon.assert.calledTwice(pushStub);
-        chai.assert.isTrue(resultStream["_shouldPushCachedPage"]);
-        chai.assert.equal(1, resultStream["_lastRetrievedIndex"]);
+            sinon.assert.calledTwice(makeReaderStub);
+            sinon.assert.calledTwice(pushStub);
+            chai.assert.isTrue(resultStream["_shouldPushCachedPage"]);
+            chai.assert.equal(1, resultStream["_lastRetrievedIndex"]);
 
-        await resultStream["_pushPageValues"]();
+            await resultStream["_pushPageValues"]();
 
-        sinon.assert.notCalled(fetchPageSpy);
-        chai.assert.equal(pushStub.callCount, 4);
-        sinon.assert.calledWith(pushStub.getCall(0), 1);
-        sinon.assert.calledWith(pushStub.getCall(1), 2);
-        sinon.assert.calledWith(pushStub.getCall(2), 3);
-        sinon.assert.calledWith(pushStub.getCall(3), 4);
-        sinon.assert.calledTwice(_lockAcquireSpy);
-        sinon.assert.calledTwice(_lockReleaseSpy);
-        chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
-        chai.assert.isFalse(resultStream["_isClosed"]);
+            sinon.assert.notCalled(fetchPageSpy);
+            chai.assert.equal(pushStub.callCount, 4);
+            sinon.assert.calledWith(pushStub.getCall(0), 1);
+            sinon.assert.calledWith(pushStub.getCall(1), 2);
+            sinon.assert.calledWith(pushStub.getCall(2), 3);
+            sinon.assert.calledWith(pushStub.getCall(3), 4);
+            sinon.assert.calledTwice(_lockAcquireSpy);
+            sinon.assert.calledTwice(_lockReleaseSpy);
+            chai.assert.isFalse(resultStream["_shouldPushCachedPage"]);
+            chai.assert.isFalse(resultStream["_isClosed"]);
+        });
     });
  });

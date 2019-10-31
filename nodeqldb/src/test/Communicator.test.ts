@@ -77,7 +77,7 @@ let sendCommandStub: sinon.SinonStub;
 let testQldbLowLevelClient: QLDBSession;
 let communicator: Communicator;
 
-describe("Communicator test", () => {
+describe("Communicator", () => {
 
     beforeEach(async () => {
         testQldbLowLevelClient = new QLDBSession(testLowLevelClientOptions);
@@ -94,167 +94,198 @@ describe("Communicator test", () => {
         sandbox.restore();
     });
 
-    it("Test abortTransaction", async () => {
-        await communicator.abortTransaction();
-        const testRequest: SendCommandRequest = {
-            SessionToken: testSessionToken,
-            AbortTransaction: {}
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-    });
-
-    it("Test commit", async () => {
-        const commitResult: CommitTransactionResult = await communicator.commit(testTransactionId, testHashToQldb);
-        const testRequest: SendCommandRequest = {
-            SessionToken: testSessionToken,
-            CommitTransaction: {
-                TransactionId: testTransactionId,
-                CommitDigest: testHashToQldb
-            }
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-        chai.assert.equal(commitResult, testSendCommandResult.CommitTransaction);
-    });
-
-    it("Test executeStatement with no parameters", async () => {
-        const result: ExecuteStatementResult = await communicator.executeStatement(
-            testTransactionId,
-            testStatement,
-            []
-        );
-        const testRequest: SendCommandRequest = {
-            SessionToken: testSessionToken,
-            ExecuteStatement: {
-                Statement: testStatement,
-                TransactionId: testTransactionId,
-                Parameters: []
-            }
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-        chai.assert.equal(result, testExecuteStatementResult);
-    });
-
-    it("Test executeStatement with parameters", async () => {
-        const result: ExecuteStatementResult = await communicator.executeStatement(testTransactionId, testStatement,
-            testParameters);
-        const testRequest: SendCommandRequest = {
-            SessionToken: testSessionToken,
-            ExecuteStatement: {
-                Statement: testStatement,
-                TransactionId: testTransactionId,
-                Parameters: testParameters
-            }
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-        chai.assert.equal(result, testExecuteStatementResult);
-    });
-
-    it("Test executeStatement with exception", async () => {
-        sendCommandStub.returns({
-            promise: () => {
-                throw new Error(testMessage);
-            }
+    describe("#create()", () => {
+        it("should have all attributes equal to mock values when static factory method called", async () => {
+            chai.assert.equal(communicator["_qldbClient"], testQldbLowLevelClient);
+            chai.assert.equal(communicator["_ledgerName"], testLedgerName);
+            chai.assert.equal(communicator["_sessionToken"], testSessionToken);
         });
-        const testRequest: SendCommandRequest = {
-            SessionToken: testSessionToken,
-            ExecuteStatement: {
-                Statement: testStatement,
-                TransactionId: testTransactionId,
-                Parameters: []
-            }
-        };
-        await chai.expect(communicator.executeStatement(testTransactionId, testStatement, [])).to.be.rejected;
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
     });
 
-    it("Test endSession", async () => {
-        await communicator.endSession();
-        const testRequest: SendCommandRequest = {
-            EndSession: {},
-            SessionToken: testSessionToken
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-    });
-
-    it("Test endSession with exception", async () => {
-        sendCommandStub.returns({
-            promise: () => {
-                throw new Error(testMessage);
-            }
+    describe("#abortTransaction()", () => {
+        it("should call AWS SDK's sendCommand with abort request when called", async () => {
+            await communicator.abortTransaction();
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                AbortTransaction: {}
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
         });
-        const logSpy = sandbox.spy(logUtil, "warn");
-        await communicator.endSession();
-        const testRequest: SendCommandRequest = {
-            EndSession: {},
-            SessionToken: testSessionToken
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-        sinon.assert.calledOnce(logSpy);
     });
 
-    it("Test fetchPage", async () => {
-        const page: Page = await communicator.fetchPage(testTransactionId, testPageToken);
-        const testRequest: SendCommandRequest = {
-            SessionToken: testSessionToken,
-            FetchPage: {
-                TransactionId: testTransactionId,
-                NextPageToken: testPageToken
-            }
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-        chai.assert.equal(page, testPage);
-    });
-
-    it("Test getLedgerName", () => {
-        const ledgerName: string = communicator.getLedgerName();
-        chai.assert.equal(ledgerName, testLedgerName);
-    });
-
-    it("Test getLowLevelClient", () => {
-        const lowLevelClient: QLDBSession = communicator.getLowLevelClient();
-        chai.assert.equal(lowLevelClient, testQldbLowLevelClient);
-    });
-
-    it("Test getSessionToken", () => {
-        const sessionToken: string = communicator.getSessionToken();
-        chai.assert.equal(sessionToken, testSessionToken);
-    });
-
-    it("Test startTransaction", async () => {
-        const txnId: string = await communicator.startTransaction();
-        const testRequest: SendCommandRequest = {
-            SessionToken: testSessionToken,
-            StartTransaction: {}
-        };
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, testRequest);
-        chai.assert.equal(txnId, testTransactionId);
-    });
-
-    it("Test _sendCommand", async () => {
-        const mockSendCommandRequest: SendCommandRequest = {};
-        const result: SendCommandResult = await communicator["_sendCommand"](mockSendCommandRequest);
-        sinon.assert.calledTwice(sendCommandStub);
-        sinon.assert.calledWith(sendCommandStub, mockSendCommandRequest);
-        chai.assert.equal(result, testSendCommandResult);
-    });
-
-    it("Test _sendCommand with exception", async () => {
-        sendCommandStub.returns({
-            promise: () => {
-                throw new Error(testMessage);
-            }
+    describe("#commit()", () => {
+        it("should call AWS SDK's sendCommand with commit request when called", async () => {
+            const commitResult: CommitTransactionResult = await communicator.commit(testTransactionId, testHashToQldb);
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                CommitTransaction: {
+                    TransactionId: testTransactionId,
+                    CommitDigest: testHashToQldb
+                }
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+            chai.assert.equal(commitResult, testSendCommandResult.CommitTransaction);
         });
-        const mockSendCommandRequest: SendCommandRequest = {};
-        const sendCommand = communicator["_sendCommand"];
-        await chai.expect(sendCommand(mockSendCommandRequest)).to.be.rejected;
+    });
+
+    describe("#executeStatement()", () => {
+        it("should return an ExecuteStatementResult object when provided with a statement", async () => {
+            const result: ExecuteStatementResult = await communicator.executeStatement(
+                testTransactionId,
+                testStatement,
+                []
+            );
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                ExecuteStatement: {
+                    Statement: testStatement,
+                    TransactionId: testTransactionId,
+                    Parameters: []
+                }
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+            chai.assert.equal(result, testExecuteStatementResult);
+        });
+
+        it("should return an ExecuteStatementResult object when provided with a statement and parameters", async () => {
+            const result: ExecuteStatementResult = await communicator.executeStatement(
+                testTransactionId,
+                testStatement,
+                testParameters
+            );
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                ExecuteStatement: {
+                    Statement: testStatement,
+                    TransactionId: testTransactionId,
+                    Parameters: testParameters
+                }
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+            chai.assert.equal(result, testExecuteStatementResult);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                ExecuteStatement: {
+                    Statement: testStatement,
+                    TransactionId: testTransactionId,
+                    Parameters: []
+                }
+            };
+            await chai.expect(communicator.executeStatement(testTransactionId, testStatement, [])).to.be.rejected;
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+        });
+    });
+
+    describe("#endSession()", () => {
+        it("should call AWS SDK's sendCommand with end session request when called", async () => {
+            await communicator.endSession();
+            const testRequest: SendCommandRequest = {
+                EndSession: {},
+                SessionToken: testSessionToken
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+        });
+
+        it("should log a warning when error thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            const logSpy = sandbox.spy(logUtil, "warn");
+            await communicator.endSession();
+            const testRequest: SendCommandRequest = {
+                EndSession: {},
+                SessionToken: testSessionToken
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+            sinon.assert.calledOnce(logSpy);
+        });
+    });
+
+    describe("#fetchPage()", () => {
+        it("should return a Page object when called", async () => {
+            const page: Page = await communicator.fetchPage(testTransactionId, testPageToken);
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                FetchPage: {
+                    TransactionId: testTransactionId,
+                    NextPageToken: testPageToken
+                }
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+            chai.assert.equal(page, testPage);
+        });
+    });
+
+    describe("#getLedgerName()", () => {
+        it("should return the ledger name when called", () => {
+            const ledgerName: string = communicator.getLedgerName();
+            chai.assert.equal(ledgerName, testLedgerName);
+        });
+    });
+
+    describe("#isInvalidSessionException()", () => {
+        it("should return the low level client when called", () => {
+            const lowLevelClient: QLDBSession = communicator.getLowLevelClient();
+            chai.assert.equal(lowLevelClient, testQldbLowLevelClient);
+        });
+    });
+
+    describe("#getLowLevelClient()", () => {
+        it("should return the session token when called", () => {
+            const sessionToken: string = communicator.getSessionToken();
+            chai.assert.equal(sessionToken, testSessionToken);
+        });
+    });
+
+    describe("#startTransaction()", () => {
+        it("should return the newly started transaction's transaction ID when called", async () => {
+            const txnId: string = await communicator.startTransaction();
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                StartTransaction: {}
+            };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+            chai.assert.equal(txnId, testTransactionId);
+        });
+    });
+
+    describe("#_sendCommand()", () => {
+        it("should return a SendCommandResult object when called", async () => {
+            const mockSendCommandRequest: SendCommandRequest = {};
+            const result: SendCommandResult = await communicator["_sendCommand"](mockSendCommandRequest);
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, mockSendCommandRequest);
+            chai.assert.equal(result, testSendCommandResult);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            const mockSendCommandRequest: SendCommandRequest = {};
+            const sendCommand = communicator["_sendCommand"];
+            await chai.expect(sendCommand(mockSendCommandRequest)).to.be.rejected;
+        });
     });
 });

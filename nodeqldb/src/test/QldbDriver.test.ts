@@ -43,7 +43,7 @@ let qldbDriver: QldbDriver;
 let sendCommandStub;
 let testQldbLowLevelClient: QLDBSession;
 
-describe("QldbDriver test", () => {
+describe("QldbDriver", () => {
     beforeEach(() => {
         testQldbLowLevelClient = new QLDBSession(testLowLevelClientOptions);
         sendCommandStub = sandbox.stub(testQldbLowLevelClient, "sendCommand");
@@ -60,38 +60,44 @@ describe("QldbDriver test", () => {
         sandbox.restore();
     });
 
-    it("Test constructor", () => {
-        chai.assert.equal(qldbDriver["_ledgerName"], testLedgerName);
-        chai.assert.equal(qldbDriver["_retryLimit"], testDefaultRetryLimit);
-        chai.assert.equal(qldbDriver["_isClosed"], false);
-        chai.assert.instanceOf(qldbDriver["_qldbClient"], QLDBSession);
-        chai.assert.equal(qldbDriver["_qldbClient"].config.maxRetries, testMaxRetries);
+    describe("#constructor()", () => {
+        it("should have all attributes equal to mock values when constructor called", () => {
+            chai.assert.equal(qldbDriver["_ledgerName"], testLedgerName);
+            chai.assert.equal(qldbDriver["_retryLimit"], testDefaultRetryLimit);
+            chai.assert.equal(qldbDriver["_isClosed"], false);
+            chai.assert.instanceOf(qldbDriver["_qldbClient"], QLDBSession);
+            chai.assert.equal(qldbDriver["_qldbClient"].config.maxRetries, testMaxRetries);
+        });
+
+        it("should throw RangeError when retryLimit less than zero passed in", () => {
+            const constructorFunction: Function = () => {
+                new QldbDriver(testLowLevelClientOptions, testLedgerName, -1);
+            };
+            chai.assert.throws(constructorFunction, RangeError);
+        });
     });
 
-    it("Test constructor with retryLimit less than zero", () => {
-        const constructorFunction: Function = () => {
-            new QldbDriver(testLowLevelClientOptions, testLedgerName, -1);
-        };
-        chai.assert.throws(constructorFunction, RangeError);
+    describe("#close()", () => {
+        it("should close qldbDriver when called", () => {
+            qldbDriver.close();
+            chai.assert.equal(qldbDriver["_isClosed"], true);
+        });
     });
 
-    it("Test close", () => {
-        qldbDriver.close();
-        chai.assert.equal(qldbDriver["_isClosed"], true);
-    });
+    describe("#getSession()", () => {
+        it("should return a QldbSession object when called", async () => {
+            qldbDriver["_qldbClient"] = testQldbLowLevelClient;
 
-    it("Test getSession", async () => {
-        qldbDriver["_qldbClient"] = testQldbLowLevelClient;
+            const qldbSession: QldbSession = await qldbDriver.getSession();
+            chai.assert.equal(qldbSession["_retryLimit"], testDefaultRetryLimit);
+            chai.assert.equal(qldbSession["_communicator"]["_ledgerName"], testLedgerName);
+            chai.assert.equal(qldbSession["_communicator"]["_qldbClient"], testQldbLowLevelClient);
+        });
 
-        const qldbSession: QldbSession = await qldbDriver.getSession();
-        chai.assert.equal(qldbSession["_retryLimit"], testDefaultRetryLimit);
-        chai.assert.equal(qldbSession["_communicator"]["_ledgerName"], testLedgerName);
-        chai.assert.equal(qldbSession["_communicator"]["_qldbClient"], testQldbLowLevelClient);
-    });
-
-    it("Test getSession when driver is closed", async () => {
-        qldbDriver["_isClosed"] = true;
-        const error = await chai.expect(qldbDriver.getSession()).to.be.rejected;
-        chai.assert.instanceOf(error, DriverClosedError);
+        it("should return a DriverClosedError wrapped in a rejected promise when closed", async () => {
+            qldbDriver["_isClosed"] = true;
+            const error = await chai.expect(qldbDriver.getSession()).to.be.rejected;
+            chai.assert.instanceOf(error, DriverClosedError);
+        });
     });
 });

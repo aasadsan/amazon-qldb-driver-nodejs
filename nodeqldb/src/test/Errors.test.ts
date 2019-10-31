@@ -41,7 +41,7 @@ const sandbox = sinon.createSandbox();
 const testMessage: string = "foo";
 const mockError: AWSError = <AWSError><any> sandbox.mock(AWSError);
 
-describe("Errors test", () => {
+describe("Errors", () => {
 
     afterEach(() => {
         mockError.code = undefined;
@@ -49,126 +49,156 @@ describe("Errors test", () => {
         sandbox.restore();
     });
 
-    it("Test ClientException", () => {
-        const logSpy = sandbox.spy(logUtil, "error");
-        const error = new ClientException(testMessage);
-        chai.assert.equal(error.name, "ClientException");
-        chai.assert.equal(error.message, testMessage);
-        sinon.assert.calledOnce(logSpy);
+    describe("#ClientException", () => {
+        it("should be a ClientException when new ClientException created", () => {
+            const logSpy = sandbox.spy(logUtil, "error");
+            const error = new ClientException(testMessage);
+            chai.expect(error).to.be.instanceOf(ClientException);
+            chai.assert.equal(error.name, "ClientException");
+            chai.assert.equal(error.message, testMessage);
+            sinon.assert.calledOnce(logSpy);
+        });
     });
 
-    it("Test DriverClosedError", () => {
-        const logSpy = sandbox.spy(logUtil, "error");
-        const error = new DriverClosedError();
-        chai.assert.equal(error.name, "DriverClosedError");
-        sinon.assert.calledOnce(logSpy);
+    describe("#DriverClosedError", () => {
+        it("should be a DriverClosedError when new DriverClosedError created", () => {
+            const logSpy = sandbox.spy(logUtil, "error");
+            const error = new DriverClosedError();
+            chai.expect(error).to.be.instanceOf(DriverClosedError);
+            chai.assert.equal(error.name, "DriverClosedError");
+            sinon.assert.calledOnce(logSpy);
+        });
     });
 
-    it("Test LambdaAbortedError", () => {
-        const logSpy = sandbox.spy(logUtil, "error");
-        const error = new LambdaAbortedError();
-        chai.assert.equal(error.name, "LambdaAbortedError");
-        sinon.assert.calledOnce(logSpy);
+    describe("#LambdaAbortedError", () => {
+        it("should be a LambdaAbortedError when new LambdaAbortedError created", () => {
+            const logSpy = sandbox.spy(logUtil, "error");
+            const error = new LambdaAbortedError();
+            chai.expect(error).to.be.instanceOf(LambdaAbortedError);
+            chai.assert.equal(error.name, "LambdaAbortedError");
+            sinon.assert.calledOnce(logSpy);
+        });
     });
 
-    it("Test SessionClosedError", () => {
-        const logSpy = sandbox.spy(logUtil, "error");
-        const error = new SessionClosedError();
-        chai.assert.equal(error.name, "SessionClosedError");
-        sinon.assert.calledOnce(logSpy);
+    describe("#SessionClosedError", () => {
+        it("should be a SessionClosedError when new SessionClosedError created", () => {
+            const logSpy = sandbox.spy(logUtil, "error");
+            const error = new SessionClosedError();
+            chai.expect(error).to.be.instanceOf(SessionClosedError);
+            chai.assert.equal(error.name, "SessionClosedError");
+            sinon.assert.calledOnce(logSpy);
+        });
     });
 
-    it("Test SessionPoolEmptyError", () => {
-        const logSpy = sandbox.spy(logUtil, "error");
-        const error = new SessionPoolEmptyError(1);
-        chai.assert.equal(error.name, "SessionPoolEmptyError");
-        sinon.assert.calledOnce(logSpy);
+    describe("#SessionPoolEmptyError", () => {
+        it("should be a SessionPoolEmptyError when new SessionPoolEmptyError created", () => {
+            const logSpy = sandbox.spy(logUtil, "error");
+            const error = new SessionPoolEmptyError(1);
+            chai.expect(error).to.be.instanceOf(SessionPoolEmptyError);
+            chai.assert.equal(error.name, "SessionPoolEmptyError");
+            sinon.assert.calledOnce(logSpy);
+        });
     });
 
-    it("Test TransactionClosedError", () => {
-        const logSpy = sandbox.spy(logUtil, "error");
-        const error = new TransactionClosedError();
-        chai.assert.equal(error.name, "TransactionClosedError");
-        sinon.assert.calledOnce(logSpy);
+    describe("#TransactionClosedError", () => {
+        it("should be a TransactionClosedError when new TransactionClosedError created", () => {
+            const logSpy = sandbox.spy(logUtil, "error");
+            const error = new TransactionClosedError();
+            chai.expect(error).to.be.instanceOf(TransactionClosedError);
+            chai.assert.equal(error.name, "TransactionClosedError");
+            sinon.assert.calledOnce(logSpy);
+        });
     });
 
-    it("Test isInvalidParameterException true", () => {
-        mockError.code = "InvalidParameterException";
-        chai.assert.isTrue(isInvalidParameterException(mockError));
+    describe("#isInvalidParameterException()", () => {
+        it("should return true when error is an InvalidParameterException", () => {
+            mockError.code = "InvalidParameterException";
+            chai.assert.isTrue(isInvalidParameterException(mockError));
+        });
+
+        it("should return false when error is not an InvalidParameterException", () => {
+            mockError.code = "NotInvalidParameterException";
+            chai.assert.isFalse(isInvalidParameterException(mockError));
+        });
     });
 
-    it("Test isInvalidParameterException false", () => {
-        mockError.code = "NotInvalidParameterException";
-        chai.assert.isFalse(isInvalidParameterException(mockError));
+    describe("#isInvalidSessionException()", () => {
+        it("should return true when error is an InvalidSessionException", () => {
+            mockError.code = "InvalidSessionException";
+            chai.assert.isTrue(isInvalidSessionException(mockError));
+        });
+
+        it("should return false when error is not an InvalidSessionException", () => {
+            mockError.code = "NotInvalidSessionException";
+            chai.assert.isFalse(isInvalidSessionException(mockError));
+        });
     });
 
-    it("Test isInvalidSessionException true", () => {
-        mockError.code = "InvalidSessionException";
-        chai.assert.isTrue(isInvalidSessionException(mockError));
+    describe("#isOccConflictException()", () => {
+        it("should return true when error is an OccConflictException", () => {
+            mockError.code = "OccConflictException";
+            chai.assert.isTrue(isOccConflictException(mockError));
+        });
+
+        it("should return false when error is not an OccConflictException", () => {
+            mockError.code = "NotOccConflictException";
+            chai.assert.isFalse(isOccConflictException(mockError));
+        });
     });
 
-    it("Test isInvalidSessionException false", () => {
-        mockError.code = "NotInvalidSessionException";
-        chai.assert.isFalse(isInvalidSessionException(mockError));
+    describe("#isResourceNotFoundException()", () => {
+        it("should return true when error is a ResourceNotFoundException", () => {
+            mockError.code = "ResourceNotFoundException";
+            chai.assert.isTrue(isResourceNotFoundException(mockError));
+        });
+
+        it("should return false when error is not a ResourceNotFoundException", () => {
+            mockError.code = "NotResourceNotFoundException";
+            chai.assert.isFalse(isResourceNotFoundException(mockError));
+        });
     });
 
-    it("Test isOccConflictException true", () => {
-        mockError.code = "OccConflictException";
-        chai.assert.isTrue(isOccConflictException(mockError));
+    describe("#isResourcePreconditionNotMetException()", () => {
+        it("should return true when error is a ResourcePreconditionNotMetException", () => {
+            mockError.code = "ResourcePreconditionNotMetException";
+            chai.assert.isTrue(isResourcePreconditionNotMetException(mockError));
+        });
+
+        it("should return false when error is not a ResourcePreconditionNotMetException", () => {
+            mockError.code = "NotResourcePreconditionNotMetException";
+            chai.assert.isFalse(isResourcePreconditionNotMetException(mockError));
+        });
     });
 
-    it("Test isOccConflictException false", () => {
-        mockError.code = "NotOccConflictException";
-        chai.assert.isFalse(isOccConflictException(mockError));
-    });
+    describe("#isRetriableException()", () => {
+        it("should return true with statusCode 500", () => {
+            mockError.code = "NotRetriableException";
+            mockError.statusCode = 500;
+            chai.assert.isTrue(isRetriableException(mockError));
+        });
 
-    it("Test isResourceNotFoundException true", () => {
-        mockError.code = "ResourceNotFoundException";
-        chai.assert.isTrue(isResourceNotFoundException(mockError));
-    });
+        it("should reeturn true with statusCode 503", () => {
+            mockError.code = "NotRetriableException";
+            mockError.statusCode = 503;
+            chai.assert.isTrue(isRetriableException(mockError));
+        });
 
-    it("Test isResourceNotFoundException false", () => {
-        mockError.code = "NotResourceNotFoundException";
-        chai.assert.isFalse(isResourceNotFoundException(mockError));
-    });
+        it("should return true when error is NoHttpResponseException", () => {
+            mockError.code = "NoHttpResponseException";
+            mockError.statusCode = 200;
+            chai.assert.isTrue(isRetriableException(mockError));
+        });
 
-    it("Test isResourcePreconditionNotMetException true", () => {
-        mockError.code = "ResourcePreconditionNotMetException";
-        chai.assert.isTrue(isResourcePreconditionNotMetException(mockError));
-    });
+        it("shoud return true when error is SocketTimeoutException", () => {
+            mockError.code = "SocketTimeoutException";
+            mockError.statusCode = 200;
+            chai.assert.isTrue(isRetriableException(mockError));
+        });
 
-    it("Test isResourcePreconditionNotMetException false", () => {
-        mockError.code = "NotResourcePreconditionNotMetException";
-        chai.assert.isFalse(isResourcePreconditionNotMetException(mockError));
-    });
-
-    it("Test isRetriableException with statusCode 500", () => {
-        mockError.code = "NotRetriableException";
-        mockError.statusCode = 500;
-        chai.assert.isTrue(isRetriableException(mockError));
-    });
-
-    it("Test isRetriableException with statusCode 503", () => {
-        mockError.code = "NotRetriableException";
-        mockError.statusCode = 503;
-        chai.assert.isTrue(isRetriableException(mockError));
-    });
-
-    it("Test isRetriableException with code NoHttpResponseException", () => {
-        mockError.code = "NoHttpResponseException";
-        mockError.statusCode = 200;
-        chai.assert.isTrue(isRetriableException(mockError));
-    });
-
-    it("Test isRetriableException with code SocketTimeoutException", () => {
-        mockError.code = "SocketTimeoutException";
-        mockError.statusCode = 200;
-        chai.assert.isTrue(isRetriableException(mockError));
-    });
-
-    it("Test isRetriableException false", () => {
-        mockError.code = "NotRetriableException";
-        mockError.statusCode = 200;
-        chai.assert.isFalse(isRetriableException(mockError));
+        it("should return false when not a retriable exception", () => {
+            mockError.code = "NotRetriableException";
+            mockError.statusCode = 200;
+            chai.assert.isFalse(isRetriableException(mockError));
+        });
     });
 });

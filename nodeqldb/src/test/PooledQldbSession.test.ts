@@ -42,7 +42,7 @@ const mockTransaction: Transaction = <Transaction><any> sandbox.mock(Transaction
 
 let pooledQldbSession: PooledQldbSession;
 
-describe("PooledQldbSession test", () => {
+describe("PooledQldbSession", () => {
 
     beforeEach(() => {
         pooledQldbSession = new PooledQldbSession(mockQldbSession, testLambda);
@@ -70,169 +70,193 @@ describe("PooledQldbSession test", () => {
         sandbox.restore();
     });
 
-    it("Test close", () => {
-        const logSpy = sandbox.spy(logUtil, "log");
-        pooledQldbSession.close();
-        chai.assert.equal(pooledQldbSession["_isClosed"], true);
-        sinon.assert.calledOnce(logSpy);
-        sinon.assert.calledWith(logSpy, "Test returning session to pool...");
+    describe("#constructor()", () => {
+        it("should have all attributes equal to mock values when constructor called", () => {
+            chai.assert.equal(pooledQldbSession["_session"], mockQldbSession);
+            chai.assert.equal(pooledQldbSession["_returnSessionToPool"], testLambda);
+            chai.assert.equal(pooledQldbSession["_isClosed"], false);
+        });
     });
 
-    it("Test close when already closed", () => {
-        const logSpy = sandbox.spy(logUtil, "log");
-        pooledQldbSession["_isClosed"] = true;
-        pooledQldbSession.close();
-        sinon.assert.notCalled(logSpy);
+    describe("#close()", () => {
+        it("should close pooledQldbSession and execute the lambda when called", () => {
+            const logSpy = sandbox.spy(logUtil, "log");
+            pooledQldbSession.close();
+            chai.assert.equal(pooledQldbSession["_isClosed"], true);
+            sinon.assert.calledOnce(logSpy);
+            sinon.assert.calledWith(logSpy, "Test returning session to pool...");
+        });
+
+        it("should be a no-op when already closed", () => {
+            const logSpy = sandbox.spy(logUtil, "log");
+            pooledQldbSession["_isClosed"] = true;
+            pooledQldbSession.close();
+            sinon.assert.notCalled(logSpy);
+        });
     });
 
-    it("Test executeLambda", async () => {
-        const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
-        const query = async (txn) => {
-            return await txn.executeInline(testStatement);
-        };
-        const retryIndicator = () => {};
-        const result: Result = await pooledQldbSession.executeLambda(query, retryIndicator);
-        chai.assert.equal(result, mockResult);
-        sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, query, retryIndicator);
+    describe("#executeLambda()", () => {
+        it("should return a Result object when called", async () => {
+            const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
+            const query = async (txn) => {
+                return await txn.executeInline(testStatement);
+            };
+            const retryIndicator = () => {};
+            const result: Result = await pooledQldbSession.executeLambda(query, retryIndicator);
+            chai.assert.equal(result, mockResult);
+            sinon.assert.calledOnce(executeSpy);
+            sinon.assert.calledWith(executeSpy, query, retryIndicator);
+        });
+
+        it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
+            pooledQldbSession["_isClosed"] = true;
+            const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
+            const error = await chai.expect(pooledQldbSession.executeLambda(async (txn) => {
+                return await txn.executeInline(testStatement);
+            })).to.be.rejected;
+            chai.assert.equal(error.name, "SessionClosedError");
+            sinon.assert.notCalled(executeSpy);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            mockQldbSession.executeLambda = async () => {
+                throw new Error(testMessage);
+            };
+            const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
+            await chai.expect(pooledQldbSession.executeLambda(async (txn) => {
+                return await txn.executeInline(testStatement);
+            })).to.be.rejected;
+            sinon.assert.calledOnce(executeSpy);
+        });
     });
 
-    it("Test executeLambda when closed", async () => {
-        pooledQldbSession["_isClosed"] = true;
-        const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
-        const error = await chai.expect(pooledQldbSession.executeLambda(async (txn) => {
-            return await txn.executeInline(testStatement);
-        })).to.be.rejected;
-        chai.assert.equal(error.name, "SessionClosedError");
-        sinon.assert.notCalled(executeSpy);
+    describe("#executeStatement()", () => {
+        it("should return a Result object when provided with a statement", async () => {
+            const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
+            const result: Result = await pooledQldbSession.executeStatement(testStatement);
+            chai.assert.equal(result, mockResult);
+            sinon.assert.calledOnce(executeSpy);
+        });
+
+        it("should return a Result object when provided with a statement and parameters", async () => {
+            const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
+            const mockQldbWriter = <QldbWriter><any> sandbox.mock(createQldbWriter);
+            const result: Result = await pooledQldbSession.executeStatement(testStatement, [mockQldbWriter]);
+            chai.assert.equal(result, mockResult);
+            sinon.assert.calledOnce(executeSpy);
+            sinon.assert.calledWith(executeSpy, testStatement, [mockQldbWriter]);
+        });
+
+        it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
+            pooledQldbSession["_isClosed"] = true;
+            const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
+            const error = await chai.expect(pooledQldbSession.executeStatement(testStatement)).to.be.rejected;
+            chai.assert.equal(error.name, "SessionClosedError");
+            sinon.assert.notCalled(executeSpy);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            mockQldbSession.executeStatement = async () => {
+                throw new Error(testMessage);
+            };
+            const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
+            await chai.expect(pooledQldbSession.executeStatement(testStatement)).to.be.rejected;
+            sinon.assert.calledOnce(executeSpy);
+        });
     });
 
-    it("Test executeLambda with exception", async () => {
-        mockQldbSession.executeLambda = async () => {
-            throw new Error(testMessage);
-        };
-        const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
-        await chai.expect(pooledQldbSession.executeLambda(async (txn) => {
-            return await txn.executeInline(testStatement);
-        })).to.be.rejected;
-        sinon.assert.calledOnce(executeSpy);
+    describe("#getLedgerName()", () => {
+        it("should return the ledger name when called", () => {
+            const ledgerNameSpy = sandbox.spy(mockQldbSession, "getLedgerName");
+            const ledgerName: string = pooledQldbSession.getLedgerName();
+            chai.assert.equal(ledgerName, testLedgerName);
+            sinon.assert.calledOnce(ledgerNameSpy);
+        });
+
+        it("should throw a SessionClosedError when closed", () => {
+            pooledQldbSession["_isClosed"] = true;
+            const ledgerNameSpy = sandbox.spy(mockQldbSession, "getLedgerName");
+            chai.expect(() => {
+                pooledQldbSession.getLedgerName();
+            }).to.throw(SessionClosedError);
+            sinon.assert.notCalled(ledgerNameSpy);
+        });
     });
 
-    it("Test executeStatement", async () => {
-        const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
-        const result: Result = await pooledQldbSession.executeStatement(testStatement);
-        chai.assert.equal(result, mockResult);
-        sinon.assert.calledOnce(executeSpy);
+    describe("#getSessionToken()", () => {
+        it("should return the session token when called", () => {
+            const sessionTokenSpy = sandbox.spy(mockQldbSession, "getSessionToken");
+            const sessionToken: string = pooledQldbSession.getSessionToken();
+            chai.assert.equal(sessionToken, testSessionToken);
+            sinon.assert.calledOnce(sessionTokenSpy);
+        });
+
+        it("should throw a SessionClosedError when closed", () => {
+            pooledQldbSession["_isClosed"] = true;
+            const sessionTokenSpy = sandbox.spy(mockQldbSession, "getSessionToken");
+            chai.expect(() => {
+                pooledQldbSession.getSessionToken();
+            }).to.throw(SessionClosedError);
+            sinon.assert.notCalled(sessionTokenSpy);
+        });
     });
 
-    it("Test executeStatement with parameters", async () => {
-        const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
-        const mockQldbWriter = <QldbWriter><any> sandbox.mock(createQldbWriter);
-        const result: Result = await pooledQldbSession.executeStatement(testStatement, [mockQldbWriter]);
-        chai.assert.equal(result, mockResult);
-        sinon.assert.calledOnce(executeSpy);
-        sinon.assert.calledWith(executeSpy, testStatement, [mockQldbWriter]);
+    describe("#getTableNames()", () => {
+        it("should return a list of table names when called", async () => {
+            const tableNamesSpy = sandbox.spy(mockQldbSession, "getTableNames");
+            const tableNames: string[] = await pooledQldbSession.getTableNames();
+            chai.assert.equal(tableNames, testTableNames);
+            sinon.assert.calledOnce(tableNamesSpy);
+        });
+
+        it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
+            pooledQldbSession["_isClosed"] = true;
+            const tableNamesSpy = sandbox.spy(mockQldbSession, "getTableNames");
+            const error = await chai.expect(pooledQldbSession.getTableNames()).to.be.rejected;
+            chai.assert.equal(error.name, "SessionClosedError");
+            sinon.assert.notCalled(tableNamesSpy);
+        });
     });
 
-    it("Test executeStatement when closed", async () => {
-        pooledQldbSession["_isClosed"] = true;
-        const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
-        const error = await chai.expect(pooledQldbSession.executeStatement(testStatement)).to.be.rejected;
-        chai.assert.equal(error.name, "SessionClosedError");
-        sinon.assert.notCalled(executeSpy);
+    describe("#startTransaction()", () => {
+        it("should return a Transaction object when called", async () => {
+            const transactionSpy = sandbox.spy(mockQldbSession, "startTransaction");
+            const transaction: Transaction = await pooledQldbSession.startTransaction();
+            chai.assert.equal(transaction, mockTransaction);
+            sinon.assert.calledOnce(transactionSpy);
+        });
+
+        it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
+            pooledQldbSession["_isClosed"] = true;
+            const transactionSpy = sandbox.spy(mockQldbSession, "startTransaction");
+            const error = await chai.expect(pooledQldbSession.startTransaction()).to.be.rejected;
+            chai.assert.equal(error.name, "SessionClosedError");
+            sinon.assert.notCalled(transactionSpy);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            mockQldbSession.startTransaction = async () => {
+                throw new Error(testMessage);
+            };
+            const transactionSpy = sandbox.spy(mockQldbSession, "startTransaction");
+            await chai.expect(pooledQldbSession.startTransaction()).to.be.rejected;
+            sinon.assert.calledOnce(transactionSpy);
+        });
     });
 
-    it("Test executeStatement with exception", async () => {
-        mockQldbSession.executeStatement = async () => {
-            throw new Error(testMessage);
-        };
-        const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
-        await chai.expect(pooledQldbSession.executeStatement(testStatement)).to.be.rejected;
-        sinon.assert.calledOnce(executeSpy);
-    });
+    describe("#_isClosed()", () => {
+        it("should throw a SessionClosedError when closed", () => {
+            pooledQldbSession["_isClosed"] = true;
+            chai.expect(() => {
+                pooledQldbSession["_throwIfClosed"]();
+            }).to.throw(SessionClosedError);
+        });
 
-    it("Test getLedgerName", () => {
-        const ledgerNameSpy = sandbox.spy(mockQldbSession, "getLedgerName");
-        const ledgerName: string = pooledQldbSession.getLedgerName();
-        chai.assert.equal(ledgerName, testLedgerName);
-        sinon.assert.calledOnce(ledgerNameSpy);
-    });
-
-    it("Test getLedgerName when closed", () => {
-        pooledQldbSession["_isClosed"] = true;
-        const ledgerNameSpy = sandbox.spy(mockQldbSession, "getLedgerName");
-        chai.expect(() => {
-            pooledQldbSession.getLedgerName();
-        }).to.throw(SessionClosedError);
-        sinon.assert.notCalled(ledgerNameSpy);
-    });
-
-    it("Test getSessionToken", () => {
-        const sessionTokenSpy = sandbox.spy(mockQldbSession, "getSessionToken");
-        const sessionToken: string = pooledQldbSession.getSessionToken();
-        chai.assert.equal(sessionToken, testSessionToken);
-        sinon.assert.calledOnce(sessionTokenSpy);
-    });
-
-    it("Test getSessionToken when closed", () => {
-        pooledQldbSession["_isClosed"] = true;
-        const sessionTokenSpy = sandbox.spy(mockQldbSession, "getSessionToken");
-        chai.expect(() => {
-            pooledQldbSession.getSessionToken();
-        }).to.throw(SessionClosedError);
-        sinon.assert.notCalled(sessionTokenSpy);
-    });
-
-    it("Test getTableNames", async () => {
-        const tableNamesSpy = sandbox.spy(mockQldbSession, "getTableNames");
-        const tableNames: string[] = await pooledQldbSession.getTableNames();
-        chai.assert.equal(tableNames, testTableNames);
-        sinon.assert.calledOnce(tableNamesSpy);
-    });
-
-    it("Test getTableNames when closed", async () => {
-        pooledQldbSession["_isClosed"] = true;
-        const tableNamesSpy = sandbox.spy(mockQldbSession, "getTableNames");
-        const error = await chai.expect(pooledQldbSession.getTableNames()).to.be.rejected;
-        chai.assert.equal(error.name, "SessionClosedError");
-        sinon.assert.notCalled(tableNamesSpy);
-    });
-
-    it("Test startTransaction", async () => {
-        const transactionSpy = sandbox.spy(mockQldbSession, "startTransaction");
-        const transaction: Transaction = await pooledQldbSession.startTransaction();
-        chai.assert.equal(transaction, mockTransaction);
-        sinon.assert.calledOnce(transactionSpy);
-    });
-
-    it("Test startTransaction when closed", async () => {
-        pooledQldbSession["_isClosed"] = true;
-        const transactionSpy = sandbox.spy(mockQldbSession, "startTransaction");
-        const error = await chai.expect(pooledQldbSession.startTransaction()).to.be.rejected;
-        chai.assert.equal(error.name, "SessionClosedError");
-        sinon.assert.notCalled(transactionSpy);
-    });
-
-    it("Test startTransaction with exception", async () => {
-        mockQldbSession.startTransaction = async () => {
-            throw new Error(testMessage);
-        };
-        const transactionSpy = sandbox.spy(mockQldbSession, "startTransaction");
-        await chai.expect(pooledQldbSession.startTransaction()).to.be.rejected;
-        sinon.assert.calledOnce(transactionSpy);
-    });
-
-    it("Test _throwIfClosed when closed", () => {
-        pooledQldbSession["_isClosed"] = true;
-        chai.expect(() => {
+        it("should close the pooledQldbSession when called", () => {
             pooledQldbSession["_throwIfClosed"]();
-        }).to.throw(SessionClosedError);
-    });
-
-    it("Test _throwIfClosed when not closed", () => {
-        pooledQldbSession["_throwIfClosed"]();
-        chai.assert.equal(pooledQldbSession["_isClosed"], false);
-        pooledQldbSession.close();
-        chai.assert.equal(pooledQldbSession["_isClosed"], true);
+            chai.assert.equal(pooledQldbSession["_isClosed"], false);
+            pooledQldbSession.close();
+            chai.assert.equal(pooledQldbSession["_isClosed"], true);
+        });
     });
 });
