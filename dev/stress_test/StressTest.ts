@@ -12,8 +12,8 @@
  */
 
 import { PooledQldbDriver, QldbSession, Transaction } from "qldb-node-client";
-import { Reader } from "qldb-node-client/node_modules/ion-js";
 import { Readable } from "stream";
+import { Reader } from "qldb-node-client/node_modules/ion-js";
 
 import { log } from "./logUtil";
 import { Metric } from "./Metric";
@@ -21,7 +21,7 @@ import { Metric } from "./Metric";
 const DEFAULT_DURATION_MS: string = "10000";
 const DEFAULT_MULTI_QUERY_TXN : string = "false";
 const DEFAULT_NUMBER_OF_THREADS: string = "5";
-const FILE_NAME: string = "StressTest";
+const FILE_NAME: string = "StressTestResults";
 const LEDGER_NAME: string = "MultiThreadStressTest";
 const TABLE_NAME: string = "StressTest";
 const SELECT_QUERY: string = `SELECT * FROM ${TABLE_NAME}`;
@@ -79,7 +79,7 @@ async function testSuite(
         pooledQldbSession = await pooledQldbDriver.getSession();
 
         while (!isFinished.value) {
-            let transaction: Transaction = await _startTransaction(pooledQldbSession, startTransactionMetric);
+            let transaction: Transaction = await startTransaction(pooledQldbSession, startTransactionMetric);
             let i: number = 0;
             while (i < queriesPerTransaction && !isFinished.value) {
                 let startExecuteTime: number = Date.now();
@@ -105,7 +105,7 @@ async function testSuite(
  * @param startTransactionMetric The metric measuring the amount of time it took to start a transaction.
  * @returns Promise which fulfills with the new transaction. 
  */
-async function _startTransaction(
+async function startTransaction(
     pooledQldbSession: QldbSession,
     startTransactionMetric: Metric
 ): Promise<Transaction> {
