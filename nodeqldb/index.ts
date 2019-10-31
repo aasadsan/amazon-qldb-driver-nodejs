@@ -1,5 +1,6 @@
 export {
     isInvalidParameterException,
+    isInvalidSessionException,
     isOccConflictException,
     isResourceNotFoundException,
     isResourcePreconditionNotMetException

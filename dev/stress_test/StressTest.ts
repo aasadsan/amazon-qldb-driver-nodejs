@@ -11,7 +11,7 @@
  * and limitations under the License.
  */
 
-import { PooledQldbDriver, QldbSession, Transaction } from "qldb-node-client";
+import { isInvalidSessionException, PooledQldbDriver, QldbSession, Transaction } from "qldb-node-client";
 import { Readable } from "stream";
 import { Reader } from "qldb-node-client/node_modules/ion-js";
 
@@ -79,16 +79,26 @@ async function testSuite(
         pooledQldbSession = await pooledQldbDriver.getSession();
 
         while (!isFinished.value) {
-            let transaction: Transaction = await startTransaction(pooledQldbSession, startTransactionMetric);
-            let i: number = 0;
-            while (i < queriesPerTransaction && !isFinished.value) {
-                let startExecuteTime: number = Date.now();
-                let resultStream: Readable = await transaction.executeStream(SELECT_QUERY);
-                executeMetric.give(Date.now() - startExecuteTime);
-                await fetchPages(resultStream, fetchPageMetric);
-                i++;
+            try {
+                let transaction: Transaction = await startTransaction(pooledQldbSession, startTransactionMetric);
+                let i: number = 0;
+                while (i < queriesPerTransaction && !isFinished.value) {
+                    let startExecuteTime: number = Date.now();
+                    let resultStream: Readable = await transaction.executeStream(SELECT_QUERY);
+                    executeMetric.give(Date.now() - startExecuteTime);
+                    await fetchPages(resultStream, fetchPageMetric);
+                    i++;
+                }
+                await transaction.abort();
+            } catch (e) {
+                if (isInvalidSessionException(e)) {
+                    log(e);
+                    pooledQldbSession.close();
+                    pooledQldbSession = await pooledQldbDriver.getSession();
+                } else {
+                    throw e;
+                }
             }
-            await transaction.abort();
         }
     } catch (e) {
         log(e);
