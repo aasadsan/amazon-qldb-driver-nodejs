@@ -12,15 +12,15 @@
  */
 
 import { isInvalidSessionException, PooledQldbDriver, QldbSession, Transaction } from "qldb-node-client";
-import { Readable } from "stream";
 import { Reader } from "qldb-node-client/node_modules/ion-js";
+import { Readable } from "stream";
 
 import { log } from "./logUtil";
 import { Metric } from "./Metric";
 
 const DEFAULT_DURATION_MS: string = "10000";
 const DEFAULT_MULTI_QUERY_TXN : string = "false";
-const DEFAULT_NUMBER_OF_THREADS: string = "5";
+const DEFAULT_NUMBER_OF_CONCURRENT_SESSIONS: string = "5";
 const FILE_NAME: string = "StressTestResults";
 const LEDGER_NAME: string = "MultiThreadStressTest";
 const TABLE_NAME: string = "StressTest";
@@ -29,28 +29,26 @@ const SERVICE_CONFIGURATION_OPTIONS = {
     region: "us-east-2"
 };
 
-let args: string[] = [DEFAULT_NUMBER_OF_THREADS, DEFAULT_DURATION_MS, DEFAULT_MULTI_QUERY_TXN];
+let args: string[] = [DEFAULT_NUMBER_OF_CONCURRENT_SESSIONS, DEFAULT_DURATION_MS, DEFAULT_MULTI_QUERY_TXN];
 
 /**
  * Iterate through result stream and update fetch page metric.
  * @param resultStream A a result stream containing the statement execution returned from QLDB.
  * @param fetchPageMetric The metric measuring the amount of time it took to iterate through results.
- * @returns Promise which fulfills with a list of readers. 
+ * @returns Promise which fulfills with void. 
  */
-async function fetchPages(resultStream: Readable, fetchPageMetric: Metric): Promise<Reader[]> {
+async function fetchPages(resultStream: Readable, fetchPageMetric: Metric): Promise<void> {
     return new Promise(res => {
         let i: number = 0;
         let startFetchPageTime: number = Date.now();
-        let listOfReaders: Reader[] = [];
         resultStream.on("data", function(reader) {
             if (0 != i && 0 === (i % 200)) {
                 fetchPageMetric.give(Date.now() - startFetchPageTime);
                 startFetchPageTime = Date.now();
             }
-            listOfReaders.push(reader);
             i++;
         }).on("end", function() {
-            res(listOfReaders);
+            res();
         });
     });
 }
@@ -129,7 +127,7 @@ async function startTransaction(
  * Run the stress test and write the results to a log file.
  * 
  * The command line arguments; the first 3 configure the test. An invalid or no input causes the default to be used.
- * 1. The number of threads. Must be an integer greater than 0. Defaults to 5.
+ * 1. The number of concurrent sesssions. Must be an integer greater than 0. Defaults to 5.
  * 2. The duration of the test in milliseconds. Must be an integer greater than 0. Defaults to 10000.
  * 3. Flag indicating whether or not to use multiple queries per transaction. Must be "true" to enable.
  *    Defaults to "false".
@@ -144,7 +142,7 @@ var main = async () => {
                 }
                 args[i] = commandLineArgs[i];
             } catch (TypeError) {
-                log("Input value for number of threads or duration is not a number; falling back to default values.");
+                log("Input value for number of concurrent sessions or duration is not a number; falling back to default values.");
             }
         } else {
             args[i] = commandLineArgs[i];
