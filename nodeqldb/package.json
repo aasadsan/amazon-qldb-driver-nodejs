@@ -2,8 +2,8 @@
   "dependencies": {
     "@types/node": "12.0.2",
     "aws-sdk": "^2.546.0",
-    "ion-hash-js": "0.1.0-SNAPSHOT",
-    "ion-js": "^3.0.0",
+    "ion-hash": "^1.0.1",
+    "ion-js": "^3.1.2",
     "semaphore-async-await": "^1.5.1",
     "stream": "0.0.2"
   },
