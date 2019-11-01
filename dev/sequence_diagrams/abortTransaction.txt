@@ -1,0 +1,34 @@
+title Abort Transaction
+actor application
+
+application->QldbSession:startTransaction()
+participant Transaction
+participant ResultStream
+QldbSession->Communicator:startTransaction()
+database QLDB
+Communicator->QLDB:StartTransactionRequest
+QLDB-->>Communicator:StartTransactionResult
+Communicator->QldbSession:transactionId
+QldbSession->*Transaction:<<create>>(transactionId)
+Transaction-->>QldbSession:Transaction
+QldbSession-->>application:Transaction
+application->Transaction:executeStream()
+
+Transaction->Communicator:executeStatement()
+Communicator->QLDB:ExecuteStatementRequest
+QLDB-->>Communicator:ExecuteStatementResult
+Communicator-->>Transaction:ExecuteStatementResult
+Transaction->*ResultStream:<<create>>(ExecuteStatementResult.FirstPage)
+ResultStream-->>Transaction:ResultStream
+Transaction-->>application:ResultStream
+
+application->Transaction:abort()
+loop ResultStreamPool:ForEach
+Transaction->ResultStream:close()
+ResultStream-->>Transaction:
+end
+Transaction->Communicator:abortTransaction()
+Communicator->QLDB:AbortTransactionRequest
+QLDB-->>Communicator:AbortTransactionResult
+Communicator-->>Transaction:
+Transaction-->>application:

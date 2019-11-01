@@ -1,0 +1,24 @@
+title Execute Statement Error
+actor application
+
+application->QldbSession:executeStatement()
+participant Transaction
+participant Communicator
+database QLDB
+opt Retriable Exception and retryAttempt < retryLimit
+QldbSession->Communicator:startTransaction()
+database QLDB
+Communicator->QLDB:StartTransactionRequest
+QLDB-->>Communicator:StartTransactionResult
+Communicator-->>QldbSession:transactionId
+QldbSession->*Transaction:<<create>>(transactionId)
+Transaction-->>QldbSession:Transaction
+
+QldbSession->Transaction:executeInline()
+Transaction->Communicator:executeStatement()
+Communicator->QLDB:ExecuteStatementRequest
+QLDB-->>Communicator:ClientError
+Communicator-->>QldbSession:ClientError
+note over QldbSession:not Retriable or retryAttempt >= retryLimit
+end
+note over QldbSession:ClientError wrapped in a rejected Promise
