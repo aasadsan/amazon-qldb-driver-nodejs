@@ -7,6 +7,6 @@
         "strictNullChecks": false
     },
     "include": [
-        "src/**/*.ts"
+        "**/*.ts"
     ]
 }
