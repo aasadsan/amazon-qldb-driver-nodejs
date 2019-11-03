@@ -41,13 +41,13 @@ async function fetchPages(resultStream: Readable, fetchPageMetric: Metric): Prom
     return new Promise(res => {
         let i: number = 0;
         let startFetchPageTime: number = Date.now();
-        resultStream.on("data", function(reader) {
-            if (0 != i && 0 === (i % 200)) {
+        resultStream.on("data", (reader) => {
+            if (0 !== i && 0 === (i % 200)) {
                 fetchPageMetric.give(Date.now() - startFetchPageTime);
                 startFetchPageTime = Date.now();
             }
             i++;
-        }).on("end", function() {
+        }).on("end", () => {
             res();
         });
     });
@@ -162,7 +162,7 @@ var main = async () => {
     const fetchPageMetric: Metric = new Metric("FetchPageMetric", FILE_NAME);
     const promises: Promise<void>[] = [];
 
-    setTimeout(function() {
+    setTimeout(() => {
         isFinished.value = true;
     }, parseInt(args[1]));
 
@@ -175,7 +175,7 @@ var main = async () => {
             executeMetric,
             fetchPageMetric
             )
-        )
+        );
     }
 
     await Promise.all(promises);
