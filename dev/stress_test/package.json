@@ -1,7 +1,7 @@
 {
   "dependencies": {},
-  "name": "qldb-node-client-stress-test",
-  "description": "Stress test for the Quantum Ledger Database Node.js client",
+  "name": "qldb-node-driver-stress-test",
+  "description": "Stress test for the Node.js QLDB driver",
   "version": "0.0.0",
   "main": "src/index.ts",
   "devDependencies": {

@@ -9,7 +9,7 @@ All levels of logging are displayed and filtering by verbosity is not currently 
 2. Configure the AWS logger to log to the console.
 
 ```javascript
-import AWS = require("qldb-node-client/node_modules/aws-sdk");
+import AWS = require("qldb-node-driver/node_modules/aws-sdk");
 
 AWS.config.logger = console;
 ```
@@ -19,7 +19,7 @@ For more information: https://docs.aws.amazon.com/sdk-for-javascript/v2/develope
 
 An example of writing to a file with level DEBUG:
 ```javascript
-import AWS = require("qldb-node-client/node_modules/aws-sdk");
+import AWS = require("qldb-node-driver/node_modules/aws-sdk");
 let logplease = require("logplease");
 
 logplease.setLogfile("debug.log");

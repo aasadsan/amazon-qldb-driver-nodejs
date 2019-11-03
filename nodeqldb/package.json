@@ -7,8 +7,8 @@
     "semaphore-async-await": "^1.5.1",
     "stream": "0.0.2"
   },
-  "name": "qldb-node-client",
-  "description": "A Node.js client for working with Quantum Ledger Database",
+  "name": "qldb-node-driver",
+  "description": "A Node.js implementation of the driver for Amazon Quantum Ledger Database",
   "version": "0.1.0-beta.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -11,7 +11,7 @@
  * and limitations under the License.
  */
 
-import { config } from "qldb-node-client/node_modules/aws-sdk";
+import { config } from "qldb-node-driver/node_modules/aws-sdk";
 
 config.logger = console;
 
