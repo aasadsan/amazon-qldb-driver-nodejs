@@ -226,7 +226,8 @@ function private _private():string {
 
 ### Client and Sample App
 
-When iterating, use `forEach` when possible. When declaring anonymous functions, use the arrow syntax instead of the function syntax.
+When iterating, use `forEach` when possible. When declaring anonymous functions, use the arrow syntax instead of the 
+function syntax.
 
 ```javascript
 const good = (foo: string[]): void => {
@@ -268,5 +269,4 @@ Class and method docstrings will follow the TSDoc format:
 
 ### Client
 
-Any exceptions thrown by the client should be unchecked exceptions. When possible, the client should not wrap exceptions from
-the Amazon SDK, and they should bubble up as-is to the user.
+The client should not wrap exceptions from the Amazon SDK, and they should bubble up as-is to the user.
