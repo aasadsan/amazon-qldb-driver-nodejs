@@ -67,7 +67,7 @@ export class Metric {
      * Get the average time that the measured action took.
      * @returns The average time of the measured action in milliseconds.
      */
-    private _getAverage(): number{
+    private _getAverage(): number {
         if (0 === this._valueCount) {
             return 0;
         }
