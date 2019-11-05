@@ -36,13 +36,13 @@ The driver requires Typescript 3.5.x. Please see the link below for more detail 
 
 First, install the driver using npm:
 
-```npm install qldb-node-client --save-dev```
+```npm install amazon-qldb-driver-nodejs --save-dev```
 
 
 Then from a Typescript file, call the driver and specify the ledger name:
 
 ```javascript
-import { PooledQldbDriver, QldbSession } fromt "qldb-node-client";
+import { PooledQldbDriver, QldbSession } fromt "amazon-qldb-driver-nodejs";
 
 const testServiceConfigOptions = {
     region: "us-east-1"
