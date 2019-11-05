@@ -2,8 +2,7 @@
   "dependencies": {
     "@types/node": "12.0.2",
     "aws-sdk": "^2.546.0",
-    "ion-hash": "^1.0.1",
-    "ion-js": "^3.1.2",
+    "ion-hash-js": "^1.0.2",
     "semaphore-async-await": "^1.5.1",
     "stream": "0.0.2"
   },
@@ -24,11 +23,15 @@
     "eslint": "^6.5.1",
     "eslint-plugin-jsdoc": "^15.12.0",
     "grunt": "^1.0.4",
+    "ion-js": "~3.1.2",
     "mocha": "^6.2.0",
     "nyc": "^14.1.1",
     "sinon": "^7.3.2",
     "ts-node": "^8.3.0",
     "typescript": "^3.5.3"
+  },
+  "peerDependencies": {
+    "ion-js": "~3.1.2"
   },
   "scripts": {
     "test": "set TS_NODE_COMPILER_OPTIONS={\"strict\":false} && mocha -r ts-node/register src/**/*.test.ts",

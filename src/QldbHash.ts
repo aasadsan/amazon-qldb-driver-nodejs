@@ -12,7 +12,7 @@
  */
 
 import { createHash } from "crypto";
-import { cryptoHasherProvider, HashReader, makeHashReader } from "ion-hash";
+import { cryptoHasherProvider, HashReader, makeHashReader } from "ion-hash-js";
 import { makeReader } from "ion-js";
 
 const HASH_SIZE: number = 32
