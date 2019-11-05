@@ -16,10 +16,12 @@ import "mocha";
 
 import { QLDBSession } from "aws-sdk";
 import {
+    AbortTransactionResult,
     ClientConfiguration,
     ExecuteStatementResult,
     Page,
     PageToken,
+    StartTransactionResult,
     ValueHolder
 } from "aws-sdk/clients/qldbsession";
 import * as chai from "chai";
@@ -45,9 +47,13 @@ const testRetryLimit: number = 4;
 const testLedgerName: string = "fakeLedgerName";
 const testSessionToken: string = "sessionToken";
 const testTransactionId: string = "txnId";
+const testStartTransactionResult: StartTransactionResult = {
+    TransactionId: testTransactionId
+};
 const testMessage: string = "foo";
 const testTableNames: string[] = ["Vehicle", "Person"];
 const testStatement: string = "SELECT * FROM foo";
+const testAbortTransactionResult: AbortTransactionResult = {};
 
 const TEST_SLEEP_CAP_MS: number = 5000;
 const TEST_SLEEP_BASE_MS: number = 10;
@@ -85,13 +91,15 @@ describe("QldbSession", () => {
             return testSessionToken;
         };
         mockCommunicator.startTransaction = async () => {
-            return testTransactionId;
+            return testStartTransactionResult;
         };
-        mockCommunicator.abortTransaction = async () => {};
+        mockCommunicator.abortTransaction = async () => {
+            return testAbortTransactionResult;
+        };
         mockCommunicator.executeStatement = async () => {
             return testExecuteStatementResult;
         };
-        mockCommunicator.getLowLevelClient = () => {
+        mockCommunicator.getQldbClient = () => {
             return testQldbLowLevelClient;
         };
     });

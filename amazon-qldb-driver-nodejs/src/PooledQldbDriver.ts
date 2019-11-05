@@ -16,7 +16,7 @@ import { globalAgent } from "http";
 import Semaphore from "semaphore-async-await";
 
 import { DriverClosedError, SessionPoolEmptyError } from "./errors/Errors";
-import { debug, info } from "./logUtil";
+import { debug } from "./logUtil";
 import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbDriver } from "./QldbDriver";
 import { QldbSession } from "./QldbSession";
@@ -130,12 +130,12 @@ export class PooledQldbDriver extends QldbDriver {
                 const session: QldbSessionImpl = this._sessionPool.pop();
                 const isSessionAvailable: boolean = await session._abortOrClose();
                 if (isSessionAvailable) {
-                    info("Reusing session from pool.")
+                    debug("Reusing session from pool.")
                     return new PooledQldbSession(session, this._returnSessionToPool);
                 }
             }
             try {
-                info("Creating new pooled session.");
+                debug("Creating new pooled session.");
                 const newSession: QldbSessionImpl = <QldbSessionImpl> (await super.getSession());
                 return new PooledQldbSession(newSession, this._returnSessionToPool);
             } catch (e) {

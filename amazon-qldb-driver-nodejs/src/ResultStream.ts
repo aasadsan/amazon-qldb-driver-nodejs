@@ -11,7 +11,7 @@
  * and limitations under the License.
  */
 
-import { Page } from "aws-sdk/clients/qldbsession";
+import { FetchPageResult, Page } from "aws-sdk/clients/qldbsession";
 import { makeReader, Reader } from "ion-js";
 import { Lock } from "semaphore-async-await"
 import { Readable } from "stream";
@@ -82,7 +82,9 @@ export class ResultStream extends Readable {
             if (this._shouldPushCachedPage) {
                 this._shouldPushCachedPage = false;
             } else if (this._cachedPage.NextPageToken) {
-                this._cachedPage = await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
+                const fetchPageResult: FetchPageResult = 
+                    await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
+                this._cachedPage = fetchPageResult.Page;
                 this._lastRetrievedIndex = 0;
             }
             for (let i: number = this._lastRetrievedIndex; i < this._cachedPage.Values.length; i++) {

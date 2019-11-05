@@ -71,7 +71,9 @@ describe("Transaction", () => {
         mockCommunicator.commit = async () => {
             return testCommitTransactionResult;
         };
-        mockCommunicator.abortTransaction = async () => {};
+        mockCommunicator.abortTransaction = async () => {
+            return {};
+        };
     });
 
     afterEach(() => {

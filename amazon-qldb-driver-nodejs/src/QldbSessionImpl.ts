@@ -11,6 +11,7 @@
  * and limitations under the License.
  */
 
+import { StartTransactionResult } from "aws-sdk/clients/qldbsession";
 import { IonTypes, Reader } from "ion-js";
 import { Readable } from "stream";
 
@@ -121,7 +122,7 @@ export class QldbSessionImpl implements QldbSession {
                     if (isInvalidSessionException(e)) {
                         info(`Creating a new session to QLDB; previous session is no longer valid: ${e}.`);
                         this._communicator = await Communicator.create(
-                            this._communicator.getLowLevelClient(),
+                            this._communicator.getQldbClient(),
                             this._communicator.getLedgerName()
                         );
                     }
@@ -194,9 +195,10 @@ export class QldbSessionImpl implements QldbSession {
      */
     async startTransaction(): Promise<Transaction> {
         this._throwIfClosed();
+        const startTransactionResult: StartTransactionResult = await this._communicator.startTransaction();
         const transaction: Transaction = new Transaction(
             this._communicator,
-            await this._communicator.startTransaction()
+            startTransactionResult.TransactionId
         );
         return transaction;
     }

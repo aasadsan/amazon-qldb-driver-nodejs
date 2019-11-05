@@ -11,7 +11,7 @@
  * and limitations under the License.
  */
 
-import { IonBinary, Page, ValueHolder } from "aws-sdk/clients/qldbsession";
+import { IonBinary, FetchPageResult, Page, ValueHolder } from "aws-sdk/clients/qldbsession";
 import { makeReader, Reader } from "ion-js";
 
 import { Communicator } from "./Communicator";
@@ -96,7 +96,9 @@ export class Result {
             pageValuesArray.push(currentPage.Values);
         }
         while (currentPage.NextPageToken) {
-            currentPage = await communicator.fetchPage(txnId, currentPage.NextPageToken);
+            const fetchPageResult: FetchPageResult = 
+                await communicator.fetchPage(txnId, currentPage.NextPageToken);
+            currentPage = fetchPageResult.Page;
             if (currentPage.Values && currentPage.Values.length > 0) {
                 pageValuesArray.push(currentPage.Values);
             }

@@ -44,7 +44,9 @@ const testPageWithToken: Page = {
 
 const mockCommunicator: Communicator = <Communicator><any> sandbox.mock(Communicator);
 mockCommunicator.fetchPage = async () => {
-    return testPage;
+    return {
+        Page: testPage
+    };
 };
 
 let resultStream: ResultStream;

@@ -152,13 +152,13 @@ describe("PooledQldbDriver", () => {
             semaphoreStub.returns(Promise.resolve(true));
 
             const qldbDriverGetSessionSpy = sandbox.spy(QldbDriver.prototype, "getSession");
-            const logInfoSpy = sandbox.spy(logUtil, "info");
+            const logDebugSpy = sandbox.spy(logUtil, "debug");
 
             const pooledQldbSession: QldbSession = await pooledQldbDriver.getSession();
 
             sinon.assert.calledOnce(qldbDriverGetSessionSpy);
             sinon.assert.calledOnce(semaphoreStub);
-            sinon.assert.calledOnce(logInfoSpy);
+            sinon.assert.calledThrice(logDebugSpy);
 
             chai.assert.instanceOf(pooledQldbSession["_session"], QldbSessionImpl);
             chai.assert.equal(pooledQldbSession["_returnSessionToPool"], pooledQldbDriver["_returnSessionToPool"]);
@@ -175,7 +175,7 @@ describe("PooledQldbDriver", () => {
             pooledQldbDriver["_sessionPool"] = [mockSession];
             pooledQldbDriver["_qldbClient"] = testQldbLowLevelClient;
 
-            const logInfoSpy = sandbox.spy(logUtil, "info");
+            const logDebugSpy = sandbox.spy(logUtil, "debug");
             const abortOrCloseSpy = sandbox.spy(mockSession as any, "_abortOrClose");
 
             const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
@@ -183,7 +183,7 @@ describe("PooledQldbDriver", () => {
 
             const pooledQldbSession: QldbSession = await pooledQldbDriver.getSession();
 
-            sinon.assert.calledOnce(logInfoSpy);
+            sinon.assert.calledTwice(logDebugSpy);
             sinon.assert.calledOnce(abortOrCloseSpy);
 
             chai.assert.equal(pooledQldbSession["_session"], mockSession);

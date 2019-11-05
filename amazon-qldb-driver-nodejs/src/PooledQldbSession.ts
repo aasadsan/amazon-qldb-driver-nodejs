@@ -24,7 +24,7 @@ import { TransactionExecutor } from "./TransactionExecutor";
  */
 export class PooledQldbSession implements QldbSession {
     private _session: QldbSessionImpl;
-    private _returnSessionToPool: Function;
+    private _returnSessionToPool: (session: QldbSessionImpl) => void;
     private _isClosed: boolean;
 
     /**

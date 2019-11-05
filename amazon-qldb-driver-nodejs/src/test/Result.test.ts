@@ -86,7 +86,9 @@ describe("Result", () => {
             const finalTestPage: Page = {Values: allValues};
 
             mockCommunicator.fetchPage = async () => {
-                return finalTestPage;
+                return {
+                    Page: finalTestPage
+                };
             };
             const result: Result = await Result.create(testTransactionId, testPageWithToken, mockCommunicator);
             const resultList: Reader[] = result.getResultList();
@@ -117,7 +119,9 @@ describe("Result", () => {
             };
 
             mockCommunicator.fetchPage = async () => {
-                return finalTestPage;
+                return {
+                    Page: finalTestPage
+                };
             };
             const result: Result = await Result.create(testTransactionId, testPageWithTokenAndValue, mockCommunicator);
             const resultList: Reader[] = result.getResultList();

@@ -13,14 +13,16 @@
 
 import { QLDBSession } from "aws-sdk";
 import {
+    AbortTransactionResult,
     CommitDigest,
     CommitTransactionResult,
     ExecuteStatementResult,
-    Page,
+    FetchPageResult,
     PageToken,
     SendCommandRequest,
     SendCommandResult,
-    ValueHolder,
+    StartTransactionResult,
+    ValueHolder
 } from "aws-sdk/clients/qldbsession";
 import { inspect } from "util";
 
@@ -65,14 +67,15 @@ export class Communicator {
 
     /**
      * Send request to abort the currently active transaction.
-     * @returns Promise which fulfills with void.
+     * @returns Promise which fulfills with the abort transaction response returned from QLDB.
      */
-    async abortTransaction(): Promise<void> {
+    async abortTransaction(): Promise<AbortTransactionResult> {
         const request: SendCommandRequest = {
             SessionToken: this._sessionToken,
             AbortTransaction: {}
         };
-        await this._sendCommand(request);
+        const result: SendCommandResult = await this._sendCommand(request);
+        return result.AbortTransaction;
     }
 
     /**
@@ -138,9 +141,9 @@ export class Communicator {
      * Send fetch result request to QLDB, retrieving the next chunk of data for the result.
      * @param txnId The ID of the transaction.
      * @param pageToken The token to fetch the next page.
-     * @returns Promise which fulfills with the page from the fetch page response.
+     * @returns Promise which fulfills with the fetch page response returned from QLDB.
      */
-    async fetchPage(txnId: string, pageToken: PageToken): Promise<Page> {
+    async fetchPage(txnId: string, pageToken: PageToken): Promise<FetchPageResult> {
         const request: SendCommandRequest = {
             SessionToken: this._sessionToken,
             FetchPage: {
@@ -148,8 +151,8 @@ export class Communicator {
                 NextPageToken: pageToken
             }
         };
-        let result: SendCommandResult = await this._sendCommand(request);
-        return result.FetchPage.Page;
+        const result: SendCommandResult = await this._sendCommand(request);
+        return result.FetchPage;
     }
 
     /**
@@ -164,7 +167,7 @@ export class Communicator {
      * Get the low-level service client that communicates with QLDB.
      * @returns The low-level service client.
      */
-    getLowLevelClient(): QLDBSession {
+    getQldbClient(): QLDBSession {
         return this._qldbClient;
     }
 
@@ -178,15 +181,15 @@ export class Communicator {
 
     /**
      * Send a request to start a transaction.
-     * @returns Promise which fulfills with the transaction ID.
+     * @returns Promise which fulfills with the start transaction response returned from QLDB.
      */
-    async startTransaction(): Promise<string> {
+    async startTransaction(): Promise<StartTransactionResult> {
         const request: SendCommandRequest = {
             SessionToken: this._sessionToken,
             StartTransaction: {}
         };
         const result: SendCommandResult = await this._sendCommand(request);
-        return result.StartTransaction.TransactionId;
+        return result.StartTransaction;
     }
 
     /**

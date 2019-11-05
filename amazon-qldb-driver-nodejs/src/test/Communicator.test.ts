@@ -100,6 +100,16 @@ describe("Communicator", () => {
             chai.assert.equal(communicator["_ledgerName"], testLedgerName);
             chai.assert.equal(communicator["_sessionToken"], testSessionToken);
         });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            await chai.expect(Communicator.create(testQldbLowLevelClient, testLedgerName)).to.be.rejected;
+            sinon.assert.calledTwice(sendCommandStub);
+        });
     });
 
     describe("#abortTransaction()", () => {
@@ -109,6 +119,21 @@ describe("Communicator", () => {
                 SessionToken: testSessionToken,
                 AbortTransaction: {}
             };
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                AbortTransaction: {}
+            };
+            await chai.expect(communicator.abortTransaction()).to.be.rejected;
             sinon.assert.calledTwice(sendCommandStub);
             sinon.assert.calledWith(sendCommandStub, testRequest);
         });
@@ -127,6 +152,24 @@ describe("Communicator", () => {
             sinon.assert.calledTwice(sendCommandStub);
             sinon.assert.calledWith(sendCommandStub, testRequest);
             chai.assert.equal(commitResult, testSendCommandResult.CommitTransaction);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                CommitTransaction: {
+                    TransactionId: testTransactionId,
+                    CommitDigest: testHashToQldb
+                }
+            };
+            await chai.expect(communicator.commit(testTransactionId, testHashToQldb)).to.be.rejected;
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
         });
     });
 
@@ -220,7 +263,7 @@ describe("Communicator", () => {
 
     describe("#fetchPage()", () => {
         it("should return a Page object when called", async () => {
-            const page: Page = await communicator.fetchPage(testTransactionId, testPageToken);
+            const page: Page = (await communicator.fetchPage(testTransactionId, testPageToken)).Page;
             const testRequest: SendCommandRequest = {
                 SessionToken: testSessionToken,
                 FetchPage: {
@@ -232,6 +275,24 @@ describe("Communicator", () => {
             sinon.assert.calledWith(sendCommandStub, testRequest);
             chai.assert.equal(page, testPage);
         });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                FetchPage: {
+                    TransactionId: testTransactionId,
+                    NextPageToken: testPageToken
+                }
+            };
+            await chai.expect(communicator.fetchPage(testTransactionId, testPageToken)).to.be.rejected;
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub, testRequest);
+        });
     });
 
     describe("#getLedgerName()", () => {
@@ -241,9 +302,9 @@ describe("Communicator", () => {
         });
     });
 
-    describe("#isInvalidSessionException()", () => {
+    describe("#getQldbClient()", () => {
         it("should return the low level client when called", () => {
-            const lowLevelClient: QLDBSession = communicator.getLowLevelClient();
+            const lowLevelClient: QLDBSession = communicator.getQldbClient();
             chai.assert.equal(lowLevelClient, testQldbLowLevelClient);
         });
     });
@@ -257,7 +318,7 @@ describe("Communicator", () => {
 
     describe("#startTransaction()", () => {
         it("should return the newly started transaction's transaction ID when called", async () => {
-            const txnId: string = await communicator.startTransaction();
+            const txnId: string = (await communicator.startTransaction()).TransactionId;
             const testRequest: SendCommandRequest = {
                 SessionToken: testSessionToken,
                 StartTransaction: {}
@@ -265,6 +326,21 @@ describe("Communicator", () => {
             sinon.assert.calledTwice(sendCommandStub);
             sinon.assert.calledWith(sendCommandStub, testRequest);
             chai.assert.equal(txnId, testTransactionId);
+        });
+
+        it("should return a rejected promise when error is thrown", async () => {
+            sendCommandStub.returns({
+                promise: () => {
+                    throw new Error(testMessage);
+                }
+            });
+            const testRequest: SendCommandRequest = {
+                SessionToken: testSessionToken,
+                StartTransaction: {}
+            };
+            await chai.expect(communicator.startTransaction()).to.be.rejected;
+            sinon.assert.calledTwice(sendCommandStub);
+            sinon.assert.calledWith(sendCommandStub);
         });
     });
 
