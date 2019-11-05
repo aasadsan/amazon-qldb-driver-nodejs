@@ -2,12 +2,12 @@
 
 ### Driver
 
-All source code files should live in `nodeqldb\src`.
+All source code files should live in `amazon-qldb-driver-nodejs\src`.
 
 
 ### Unit Tests
 
-All unit tests should live in `nodeqldb\src\test`.
+All unit tests should live in `amazon-qldb-driver-nodejs\src\test`.
 
 
 ### Sample App

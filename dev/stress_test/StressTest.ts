@@ -11,8 +11,8 @@
  * and limitations under the License.
  */
 
-import { isInvalidSessionException, PooledQldbDriver, QldbSession, Transaction } from "qldb-node-driver";
-import { Reader } from "qldb-node-driver/node_modules/ion-js";
+import { isInvalidSessionException, PooledQldbDriver, QldbSession, Transaction } from "amazon-qldb-driver-nodejs";
+import { Reader } from "amazon-qldb-driver-nodejs/node_modules/ion-js";
 import { Readable } from "stream";
 
 import { log } from "./logUtil";

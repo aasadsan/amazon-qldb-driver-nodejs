@@ -11,7 +11,7 @@
  * and limitations under the License.
  */
 
-import { config } from "qldb-node-driver/node_modules/aws-sdk";
+import { config } from "amazon-qldb-driver-nodejs/node_modules/aws-sdk";
 
 config.logger = console;
 
@@ -51,9 +51,9 @@ export function isLoggerSet(): boolean {
 function _prepend(line: string, level: string): void {
     if (config.logger) {
         if (typeof config.logger.log === "function") {
-            config.logger.log(`[${level}][Javascript QLDB Stress Test] ${line}`);
+            config.logger.log(`[${level}][Amazon QLDB Driver Nodejs Stress Test] ${line}`);
         } else if (typeof config.logger.write === "function") {
-            config.logger.write(`[${level}][Javascript QLDB Stress Test] ${line}\n`);
+            config.logger.write(`[${level}][Amazon QLDB Driver Nodejs Stress Test] ${line}\n`);
         }
     }
 }

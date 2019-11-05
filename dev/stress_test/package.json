@@ -1,9 +1,8 @@
 {
   "dependencies": {},
-  "name": "qldb-node-driver-stress-test",
-  "description": "Stress test for the Node.js QLDB driver",
+  "name": "amazon-qldb-driver-nodejs-stress-test",
+  "description": "Stress test for the Amazon QLDB driver Node.js",
   "version": "0.0.0",
-  "main": "src/index.ts",
   "devDependencies": {
     "@types/node": "^12.11.7",
     "ts-node": "^8.3.0",
@@ -16,8 +15,4 @@
   },
   "license": "Apache-2.0",
   "keywords": [],
-  "repository": {
-    "type": "git",
-    "url": "TODO:addURL"
-  }
 }
