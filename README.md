@@ -34,10 +34,16 @@ The driver requires Typescript 3.5.x. Please see the link below for more detail 
 
 ## Installing the driver and running the driver
 
-First, install the driver using npm:
+First, install the driver using npm for your package:
 
-```npm install amazon-qldb-driver-nodejs --save-dev```
+```npm install amazon-qldb-driver-nodejs```
 
+The driver also has aws-sdk and ion-js as peer dependencies. Thus, they must also be dependencies of the package that
+will be using the driver as a dependency.
+
+```npm install aws-sdk```
+
+```npm install ion-js```
 
 Then from a Typescript file, call the driver and specify the ledger name:
 

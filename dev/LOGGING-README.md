@@ -2,14 +2,16 @@
 
 ### How to enable logging
 
-All levels of logging are displayed and filtering by verbosity is not currently supported. To enable logging to the console:
+All levels of logging are displayed and filtering by verbosity is not currently supported. To enable logging to the 
+console:
 
-1. Assuming the QLDB node driver is installed, it will install aws-sdk as a dependency. Import config from aws-sdk.
+1. The QLDB node driver has aws-sdk as a peer dependency. Therefore, the module that uses the driver as a dependency
+   must install aws-sdk as it's own dependency.
 
-2. Configure the AWS logger to log to the console.
+2. Configure the AWS logger to log to the console, for example.
 
 ```javascript
-import AWS = require("amazon-qldb-driver-nodejs/node_modules/aws-sdk");
+import AWS = require("aws-sdk");
 
 AWS.config.logger = console;
 ```
@@ -19,7 +21,7 @@ For more information: https://docs.aws.amazon.com/sdk-for-javascript/v2/develope
 
 An example of writing to a file with level DEBUG:
 ```javascript
-import AWS = require("amazon-qldb-driver-nodejs/node_modules/aws-sdk");
+import AWS = require("aws-sdk");
 let logplease = require("logplease");
 
 logplease.setLogfile("debug.log");
