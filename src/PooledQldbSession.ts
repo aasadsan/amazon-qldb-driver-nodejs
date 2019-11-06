@@ -29,7 +29,7 @@ export class PooledQldbSession implements QldbSession {
 
     /**
      * Creates a PooledQldbSession.
-     * @param session The QldbSession object that represents a session to a QLDB ledger
+     * @param session The QldbSession object that represents a session to a QLDB ledger.
      * @param returnSessionToPool A lambda that is invoked when {@linkcode PooledQldbSession.close} is called.
      */
     constructor(session: QldbSessionImpl, returnSessionToPool: (Session: QldbSessionImpl) => void) {

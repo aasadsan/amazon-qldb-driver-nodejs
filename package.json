@@ -6,7 +6,7 @@
     "stream": "0.0.2"
   },
   "name": "amazon-qldb-driver-nodejs",
-  "description": "The Node.js driver for working with Quantum Ledger Database",
+  "description": "The Node.js driver for working with Amazon Quantum Ledger Database",
   "version": "0.1.0-beta.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,7 +32,7 @@
   },
   "peerDependencies": {
     "aws-sdk": "^2.546.0",
-    "ion-js": "~3.1.2"
+    "ion-js": "^3.1.2"
   },
   "scripts": {
     "test": "set TS_NODE_COMPILER_OPTIONS={\"strict\":false} && mocha -r ts-node/register src/**/*.test.ts",

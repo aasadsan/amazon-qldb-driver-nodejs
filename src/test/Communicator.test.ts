@@ -309,7 +309,7 @@ describe("Communicator", () => {
         });
     });
 
-    describe("#getLowLevelClient()", () => {
+    describe("#getSessionToken()", () => {
         it("should return the session token when called", () => {
             const sessionToken: string = communicator.getSessionToken();
             chai.assert.equal(sessionToken, testSessionToken);

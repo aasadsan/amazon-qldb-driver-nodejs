@@ -48,7 +48,7 @@ will be using the driver as a dependency.
 Then from a Typescript file, call the driver and specify the ledger name:
 
 ```javascript
-import { PooledQldbDriver, QldbSession } fromt "amazon-qldb-driver-nodejs";
+import { PooledQldbDriver, QldbSession } from "amazon-qldb-driver-nodejs";
 
 const testServiceConfigOptions = {
     region: "us-east-1"
