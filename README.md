@@ -83,5 +83,5 @@ TypeDoc is used for documentation. You can generate HTML locally with the follow
 $ npm install --global typedoc
 
 # Execute typedoc on your project
-$ typedoc --out docs /src
+$ typedoc --out docs ./src --exclude **/*.test.ts
 ```
