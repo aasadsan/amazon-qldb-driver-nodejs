@@ -79,9 +79,9 @@ The performance tests have a separate README.md within the performance folder.
 TypeDoc is used for documentation. You can generate HTML locally with the following:
 
 ```
-# Install the global CLI
+# Install typedoc
 $ npm install --global typedoc
 
-# Execute typedoc on your project
-$ typedoc --out docs ./src --exclude **/*.test.ts
+# Generate the docs
+$ npm run doc
 ```
