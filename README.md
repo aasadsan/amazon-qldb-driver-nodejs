@@ -39,6 +39,10 @@ To install the driver, run the following in the root directory of the project:
 
 ```npm install```
 
+To build the driver, transpiling the TypeScript source code to JavaScript, run the following in the root directory:
+
+```npm run build```
+
 ## Using the driver as a dependency
 
 To use the driver, in your package that wishes to use the driver, run the following:
@@ -86,10 +90,4 @@ The performance tests have a separate README.md within the performance folder.
 
 TypeDoc is used for documentation. You can generate HTML locally with the following:
 
-```
-# Install typedoc
-$ npm install --global typedoc
-
-# Generate the docs
-$ npm run doc
-```
+```npm run doc```
