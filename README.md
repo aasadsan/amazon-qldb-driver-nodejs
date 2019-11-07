@@ -26,14 +26,14 @@ region = us-east-1 <or other region>
 
 See [Accessing Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/accessing.html#SettingUp.Q.GetCredentials) page for more information.
 
-### Typescript 3.5.x
+### TypeScript 3.5.x
 
-The driver is written in, and requires, Typescript 3.5.x. It will be automatically installed as a dependency. 
-Please see the link below for more detail on Typescript 3.5.x:
+The driver is written in, and requires, TypeScript 3.5.x. It will be automatically installed as a dependency. 
+Please see the link below for more detail on TypeScript 3.5.x:
 
-* [Typescript 3.5.x](https://www.npmjs.com/package/typescript)
+* [TypeScript 3.5.x](https://www.npmjs.com/package/typescript)
 
-## Installing the driver
+## Installing the Driver
 
 To install the driver, run the following in the root directory of the project:
 
@@ -43,7 +43,7 @@ To build the driver, transpiling the TypeScript source code to JavaScript, run t
 
 ```npm run build```
 
-## Using the driver as a dependency
+## Using the Driver as a Dependency
 
 To use the driver, in your package that wishes to use the driver, run the following:
 
@@ -56,7 +56,7 @@ will be using the driver as a dependency.
 
 ```npm install ion-js```
 
-Then from within your package, you can call the use the driver. This example shows usage in TpyeScript specifying the 
+Then from within your package, you can call the use the driver. This example shows usage in TypeScript specifying the 
 ledger name:
 
 ```javascript
