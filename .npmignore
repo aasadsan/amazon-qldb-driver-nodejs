@@ -6,4 +6,5 @@ coverage/*
 dev/*
 docs/*
 index.ts
+tsconfig.json
 src/*
