@@ -53,7 +53,7 @@ describe("QldbDriver", () => {
             }
         });
 
-        qldbDriver = new QldbDriver(testLowLevelClientOptions, testLedgerName);
+        qldbDriver = new QldbDriver(testLedgerName, testLowLevelClientOptions);
     });
 
     afterEach(() => {
@@ -71,7 +71,7 @@ describe("QldbDriver", () => {
 
         it("should throw RangeError when retryLimit less than zero passed in", () => {
             const constructorFunction: Function = () => {
-                new QldbDriver(testLowLevelClientOptions, testLedgerName, -1);
+                new QldbDriver(testLedgerName, testLowLevelClientOptions, -1);
             };
             chai.assert.throws(constructorFunction, RangeError);
         });

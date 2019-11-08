@@ -46,7 +46,7 @@ export class QldbDriver {
                          when an OCC conflict or retriable exception occurs. This value must not be negative.
      * @throws RangeError if `retryLimit` is less than 0.
      */
-    constructor(qldbClientOptions: ClientConfiguration, ledgerName: string, retryLimit: number = 4) {
+    constructor(ledgerName: string, qldbClientOptions: ClientConfiguration = {}, retryLimit: number = 4) {
         if (retryLimit < 0) {
             throw new RangeError("Value for retryLimit cannot be negative.");
         }

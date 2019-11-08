@@ -58,13 +58,13 @@ export class PooledQldbDriver extends QldbDriver {
      * @throws RangeError if `retryLimit` is less than 0 or `poolLimit` is greater than the client limit.
      */
     constructor(
-        qldbClientOptions: ClientConfiguration,
         ledgerName: string,
+        qldbClientOptions: ClientConfiguration = {},
         retryLimit: number = 4,
         poolLimit: number = 0,
         timeoutMillis: number = 30000
     ) {
-        super(qldbClientOptions, ledgerName, retryLimit);
+        super(ledgerName, qldbClientOptions, retryLimit);
         if (timeoutMillis < 0) {
             throw new RangeError("Value for timeout cannot be negative.");
         }

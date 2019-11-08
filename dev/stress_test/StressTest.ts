@@ -12,7 +12,6 @@
  */
 
 import { isInvalidSessionException, PooledQldbDriver, QldbSession, Transaction } from "amazon-qldb-driver-nodejs";
-import { Reader } from "amazon-qldb-driver-nodejs/node_modules/ion-js";
 import { Readable } from "stream";
 
 import { log } from "./logUtil";
@@ -25,9 +24,6 @@ const FILE_NAME: string = "StressTestResults";
 const LEDGER_NAME: string = "MultiThreadStressTest";
 const TABLE_NAME: string = "StressTest";
 const SELECT_QUERY: string = `SELECT * FROM ${TABLE_NAME}`;
-const SERVICE_CONFIGURATION_OPTIONS = {
-    region: "us-east-2"
-};
 
 let args: string[] = [DEFAULT_NUMBER_OF_CONCURRENT_SESSIONS, DEFAULT_DURATION_MS, DEFAULT_MULTI_QUERY_TXN];
 
@@ -142,7 +138,10 @@ var main = async () => {
                 }
                 args[i] = commandLineArgs[i];
             } catch (TypeError) {
-                log("Input value for number of concurrent sessions or duration is not a number; falling back to default values.");
+                log(
+                    "Input value for number of concurrent sessions or duration is not a number;" +
+                    "falling back to default values."
+                );
             }
         } else {
             args[i] = commandLineArgs[i];
@@ -155,7 +154,7 @@ var main = async () => {
     }
 
     const isFinished: { value: boolean } = { value: false };
-    const pooledQldbDriver: PooledQldbDriver = new PooledQldbDriver(SERVICE_CONFIGURATION_OPTIONS, LEDGER_NAME);
+    const pooledQldbDriver: PooledQldbDriver = new PooledQldbDriver(LEDGER_NAME);
 
     const startTransactionMetric: Metric = new Metric("StartTransaction", FILE_NAME);
     const executeMetric: Metric = new Metric("ExecuteMetric", FILE_NAME);
