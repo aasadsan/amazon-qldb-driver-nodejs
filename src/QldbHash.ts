@@ -112,7 +112,7 @@ export class QldbHash {
         if (hash1.length !== HASH_SIZE || hash2.length !== HASH_SIZE) {
             throw new RangeError("Invalid hash.");
         }
-        for (var i = hash1.length-1; i >= 0; i--) {
+        for (let i = hash1.length-1; i >= 0; i--) {
             const difference: number = (hash1[i]<<24 >>24) - (hash2[i]<<24 >>24);
             if (difference !== 0) {
                 return difference;
