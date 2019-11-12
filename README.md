@@ -84,6 +84,12 @@ TypeDoc is used for documentation. You can generate HTML locally with the follow
 
 ## Release Notes
 
+### Release 0.1.0-preview.2 (November 12, 2019)
+
+* Fix a bug in the test command that caused unit tests to fail compilation.
+* Small clarifications to the README.
+* Addition of a valid `buildspec.yml` file for running unit tests via CodeBuild.
+
 ### Release 0.1.0-preview.1 (November 8, 2019)
 
 Preview release of the driver.
