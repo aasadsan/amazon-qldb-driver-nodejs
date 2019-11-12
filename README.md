@@ -11,8 +11,8 @@ to write software that makes use of AmazonQLDB.
 
 See [Accessing Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/accessing.html) for information on connecting to AWS.
 
-The AWS SDK needs to have AWS_SDK_LOAD_CONFIG environment variable set to a truthy value as well in order to pull the
-version from the ~./.aws/config file.
+The JavaScript AWS SDK needs to have AWS_SDK_LOAD_CONFIG environment variable set to a truthy value in order to read
+from the ~./.aws/config file.
 
 See [Setting Region](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/setting-region.html) page for more information.
 
