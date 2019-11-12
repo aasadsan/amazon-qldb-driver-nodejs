@@ -12,8 +12,7 @@ phases:
     commands: 
       - echo Build started on `date` 
       - echo Compiling the Node.js code
-      - cd amazon-qldb-driver-nodejs
-      - npm install . --save-dev
+      - npm build
       - echo Running tests
       - npm run testWithCoverage
   post_build: 
