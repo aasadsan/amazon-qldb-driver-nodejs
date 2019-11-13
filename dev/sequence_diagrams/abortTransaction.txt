@@ -8,8 +8,8 @@ QldbSession->Communicator:startTransaction()
 database QLDB
 Communicator->QLDB:StartTransactionRequest
 QLDB-->>Communicator:StartTransactionResult
-Communicator->QldbSession:transactionId
-QldbSession->*Transaction:<<create>>(transactionId)
+Communicator->QldbSession:startTransactionResult
+QldbSession->*Transaction:<<create>>(startTransactionResult.transactionId)
 Transaction-->>QldbSession:Transaction
 QldbSession-->>application:Transaction
 application->Transaction:executeStream()

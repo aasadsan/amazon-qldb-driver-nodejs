@@ -9,8 +9,8 @@ QldbSession->Communicator:startTransaction()
 database QLDB
 Communicator->QLDB:StartTransactionRequest
 QLDB-->>Communicator:StartTransactionResult
-Communicator-->>QldbSession:transactionId
-QldbSession->*Transaction:<<create>>(transactionId)
+Communicator-->>QldbSession:startTransactionResult
+QldbSession->*Transaction:<<create>>(startTransactionResult.transactionId)
 Transaction-->>QldbSession:Transaction
 
 QldbSession->Transaction:executeInline()
@@ -40,5 +40,5 @@ QldbSession-->>application:Result
 
 loop NOT null
 application->Result:next(Result)
-Result-->>application:IonSymbol
+Result-->>application:Reader
 end
