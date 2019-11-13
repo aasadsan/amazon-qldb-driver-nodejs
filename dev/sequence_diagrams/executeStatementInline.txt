@@ -1,0 +1,44 @@
+title Execute Statement Inline
+actor application
+
+application->QldbSession:executeStatement()
+participant Transaction
+participant Result
+opt Retriable Exception and retryAttempt < retryLimit
+QldbSession->Communicator:startTransaction()
+database QLDB
+Communicator->QLDB:StartTransactionRequest
+QLDB-->>Communicator:StartTransactionResult
+Communicator-->>QldbSession:startTransactionResult
+QldbSession->*Transaction:<<create>>(startTransactionResult.transactionId)
+Transaction-->>QldbSession:Transaction
+
+QldbSession->Transaction:executeInline()
+Transaction->Communicator:executeStatement()
+Communicator->QLDB:ExecuteStatementRequest
+QLDB-->>Communicator:ExecuteStatementResult
+Communicator-->>Transaction:ExecuteStatementResult
+
+Transaction-->>*Result:<<create>>(ExecuteStatementResult.FirstPage)
+loop NOT null
+Result->Communicator:fetchPage()
+Communicator->QLDB:FetchPageRequest
+QLDB-->>Communicator:FetchPageResult
+Communicator-->>Result:Page
+end
+Result-->>Transaction:Result
+Transaction-->>QldbSession:Result
+
+QldbSession->Transaction:commit()
+Transaction->Communicator:commit()
+Communicator->QLDB:CommitTransactionRequest
+QLDB-->>Communicator:CommitTransactionResult
+Communicator-->>Transaction:CommitTransactionResult
+Transaction-->>QldbSession:
+end
+QldbSession-->>application:Result
+
+loop NOT null
+application->Result:next(Result)
+Result-->>application:Reader
+end
