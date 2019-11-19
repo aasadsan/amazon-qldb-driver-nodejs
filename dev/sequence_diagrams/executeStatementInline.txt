@@ -24,7 +24,7 @@ loop NOT null
 Result->Communicator:fetchPage()
 Communicator->QLDB:FetchPageRequest
 QLDB-->>Communicator:FetchPageResult
-Communicator-->>Result:Page
+Communicator-->>Result:FetchPageResult
 end
 Result-->>Transaction:Result
 Transaction-->>QldbSession:Result
