@@ -28,7 +28,7 @@ application->ResultStream:next(ResultStream)
 ResultStream->Communicator:fetchPage()
 Communicator->QLDB:FetchPageRequest
 QLDB-->>Communicator:FetchPageResult
-Communicator-->>ResultStream:Page
+Communicator-->>ResultStream:FetchPageResult
 ResultStream-->>application:Reader
 end
 application->Transaction:commit()
