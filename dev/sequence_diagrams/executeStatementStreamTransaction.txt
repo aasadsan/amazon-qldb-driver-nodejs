@@ -23,8 +23,8 @@ Transaction->*ResultStream:<<create>>(ExecuteStatementResult.FirstPage)
 ResultStream-->>Transaction:ResultStream
 Transaction-->>application:ResultStream
 
-loop NOT null
-application->ResultStream:next(ResultStream)
+loop NOT ResultStream.on("end")
+application->ResultStream:ResultStream.on("data", listenerMethod())
 ResultStream->Communicator:fetchPage()
 Communicator->QLDB:FetchPageRequest
 QLDB-->>Communicator:FetchPageResult
