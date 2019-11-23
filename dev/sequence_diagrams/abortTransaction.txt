@@ -30,5 +30,5 @@ end
 Transaction->Communicator:abortTransaction()
 Communicator->QLDB:AbortTransactionRequest
 QLDB-->>Communicator:AbortTransactionResult
-Communicator-->>Transaction:
+Communicator-->>Transaction:AbortTransactionResult
 Transaction-->>application:
