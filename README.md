@@ -76,7 +76,7 @@ or
 
 ```npm run testWithCoverage```
 
-### Documentation 
+### Documentation
 
 TypeDoc is used for documentation. You can generate HTML locally with the following:
 

@@ -1,5 +1,5 @@
 version: 0.2 
-
+ 
 env:
   git-credential-helper: yes
 
@@ -24,8 +24,8 @@ phases:
       - npm link
 
   post_build: 
-    commands:
-      - echo Build completed on `date`
+    commands: 
+      - echo Build completed on `date` 
       - echo Running contract tests
       - cd ..
       - echo Cloning sample app

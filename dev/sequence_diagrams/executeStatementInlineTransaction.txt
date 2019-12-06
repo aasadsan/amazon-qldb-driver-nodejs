@@ -1,0 +1,37 @@
+title Execute Statement Inline Transaction
+actor application
+
+application->QldbSession:startTransaction()
+participant Transaction
+participant Result
+QldbSession->Communicator:startTransaction()
+database QLDB
+Communicator->QLDB:StartTransactionRequest
+QLDB-->>Communicator:StartTransactionResult
+Communicator->QldbSession:startTransactionResult
+QldbSession->*Transaction:<<create>>(startTransactionResult.transactionId)
+Transaction-->>QldbSession:Transaction
+QldbSession-->>application:Transaction
+application->Transaction:executeInline()
+
+Transaction->Communicator:executeStatement()
+Communicator->QLDB:ExecuteStatementRequest
+QLDB-->>Communicator:ExecuteStatementResult
+Communicator-->>Transaction:ExecuteStatementResult
+Transaction->*Result:<<create>>(ExecuteStatementResult.FirstPage)
+loop NOT null
+Result->Communicator:fetchPage()
+Communicator->QLDB:FetchPageRequest
+QLDB-->>Communicator:FetchPageResult
+Communicator-->>Result:FetchPageResult
+end
+
+Result-->>Transaction:Result
+Transaction-->>application:Result
+
+application->Transaction:commit()
+Transaction->Communicator:commit()
+Communicator->QLDB:CommitTransactionRequest
+QLDB-->>Communicator:CommitTransactionResult
+Communicator-->>Transaction:CommitTransactionResult
+Transaction-->>application:

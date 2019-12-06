@@ -1,0 +1,41 @@
+title Pooled Session Open and Close
+actor application
+
+application->*PooledQldbDriver:<<create>>(ledgerName)
+participant QldbSession
+participant PooledQldbSession
+PooledQldbDriver-->>application:PooledQldbDriver
+application->PooledQldbDriver:getSession()
+PooledQldbDriver->*Communicator:Communicator.create(ledgerName)
+database QLDB
+Communicator->QLDB:StartSessionRequest
+QLDB-->>Communicator:StartSessionResponse
+Communicator-->>PooledQldbDriver:Communicator
+PooledQldbDriver->*QldbSession:<<create>>(Communicator)
+QldbSession-->>PooledQldbDriver:QldbSession
+PooledQldbDriver->*PooledQldbSession:<<create>>(QldbSession)
+PooledQldbSession-->>PooledQldbDriver:PooledQldbSession
+PooledQldbDriver-->>application:PooledQldbSession
+application->PooledQldbSession:close()
+PooledQldbSession->PooledQldbDriver:QldbSession
+PooledQldbDriver-->>PooledQldbSession:
+PooledQldbSession-->>application:
+application->PooledQldbDriver:getSession()
+PooledQldbDriver->PooledQldbSession:<<create>>(QldbSession)
+PooledQldbSession-->>PooledQldbDriver:PooledQldbSession
+PooledQldbDriver-->>application:PooledQldbSession
+application->PooledQldbSession:close()
+PooledQldbSession->PooledQldbDriver:QldbSession
+PooledQldbDriver-->>PooledQldbSession:
+PooledQldbSession-->>application:
+
+application->PooledQldbDriver:close()
+loop SessionPool:ForEach
+PooledQldbDriver->QldbSession:close()
+QldbSession->Communicator:endSession()
+Communicator->QLDB:EndSessionRequest
+QLDB-->>Communicator:EndSessionResponse
+Communicator-->>QldbSession:
+QldbSession-->>PooledQldbDriver:
+end
+PooledQldbDriver-->>application:

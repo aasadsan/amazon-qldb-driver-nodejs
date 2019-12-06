@@ -1,0 +1,43 @@
+title Execute Statement Stream Transaction
+actor application
+
+application->QldbSession:startTransaction()
+participant Transaction
+participant ResultStream
+QldbSession->Communicator:startTransaction()
+database QLDB
+Communicator->QLDB:StartTransactionRequest
+QLDB-->>Communicator:StartTransactionResult
+Communicator->QldbSession:startTransactionResult
+QldbSession->*Transaction:<<create>>(startTransactionResult.transactionId)
+Transaction-->>QldbSession:Transaction
+QldbSession-->>application:Transaction
+application->Transaction:executeStream()
+
+Transaction->Communicator:executeStatement()
+Communicator->QLDB:ExecuteStatementRequest
+QLDB-->>Communicator:ExecuteStatementResult
+Communicator-->>Transaction:ExecuteStatementResult
+Transaction->*ResultStream:<<create>>(ExecuteStatementResult.FirstPage)
+
+ResultStream-->>Transaction:ResultStream
+Transaction-->>application:ResultStream
+
+loop NOT ResultStream.on("end")
+application->ResultStream:ResultStream.on("data", listenerMethod())
+ResultStream->Communicator:fetchPage()
+Communicator->QLDB:FetchPageRequest
+QLDB-->>Communicator:FetchPageResult
+Communicator-->>ResultStream:FetchPageResult
+ResultStream-->>application:Reader
+end
+application->Transaction:commit()
+loop ResultStreamPool:ForEach
+Transaction->ResultStream:close()
+ResultStream-->>Transaction:
+end
+Transaction->Communicator:commit()
+Communicator->QLDB:CommitTransactionRequest
+QLDB-->>Communicator:CommitTransactionResult
+Communicator-->>Transaction:CommitTransactionResult
+Transaction-->>application:
