@@ -13,7 +13,7 @@
 
 import { AWSError } from "aws-sdk";
 
-import { error } from "../logUtil";
+import { error } from "../LogUtil";
 
 export class ClientException extends Error {
     constructor(message: string) {
