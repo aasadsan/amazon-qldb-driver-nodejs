@@ -30,7 +30,7 @@ import { Readable } from "stream";
 
 import { Communicator } from "../Communicator";
 import * as Errors from "../errors/Errors";
-import * as logUtil from "../logUtil";
+import * as LogUtil from "../LogUtil";
 import { QldbHash } from "../QldbHash";
 import { createQldbWriter, QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
@@ -195,7 +195,7 @@ describe("Transaction", () => {
                 throw new Error("foo2");
             };
             const isOccStub = sandbox.stub(Errors, "isOccConflictException");
-            const logSpy = sandbox.spy(logUtil, "warn");
+            const logSpy = sandbox.spy(LogUtil, "warn");
             isOccStub.returns(false);
             const commitSpy = sandbox.spy(mockCommunicator, "commit");
             const abortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
