@@ -84,41 +84,41 @@ export class ResultStream extends Readable {
      */
     private async _pushPageValues(): Promise<void> {
         await this._lock.acquire();
+        let canPush: boolean;
         try {
             if (this._shouldPushCachedPage) {
                 this._shouldPushCachedPage = false;
             } else if (this._cachedPage.NextPageToken) {
-                const fetchPageResult: FetchPageResult = 
-                    await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
-                this._cachedPage = fetchPageResult.Page;
-                this._lastRetrievedIndex = 0;
+                try {
+                    const fetchPageResult: FetchPageResult = 
+                        await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
+                    this._cachedPage = fetchPageResult.Page;
+                    this._lastRetrievedIndex = 0;
+                } catch (e) {
+                    this._isClosed = true;
+                    throw e;
+                }
             }
-
-            let canPush: boolean;
             for (let i: number = this._lastRetrievedIndex; i < this._cachedPage.Values.length; i++) {
                 const reader: Reader = makeReader(Result._handleBlob(this._cachedPage.Values[i].IonBinary));
                 canPush = this.push(reader);
                 if (!canPush) {
                     this._lastRetrievedIndex = i;
                     this._shouldPushCachedPage = this._lastRetrievedIndex < this._cachedPage.Values.length;
-                    this._isPushingData = false;
                     return;
                 }
             }
-
             if (!this._cachedPage.NextPageToken) {
                 this.push(null);
                 this._isClosed = true;
             }
-
-            this._isPushingData = false;
-
-            if (!this._isClosed) {
-                this._read();
-            }
-
         } finally {
             this._lock.release();
+            this._isPushingData = false;
+
+            if (!this._isClosed && canPush) {
+                this._read();
+            }
         }
     }
 }
