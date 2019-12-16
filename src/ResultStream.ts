@@ -84,7 +84,7 @@ export class ResultStream extends Readable {
      */
     private async _pushPageValues(): Promise<void> {
         await this._lock.acquire();
-        let canPush: boolean;
+        let canPush: boolean = true;
         try {
             if (this._shouldPushCachedPage) {
                 this._shouldPushCachedPage = false;

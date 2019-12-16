@@ -91,7 +91,7 @@ describe("ResultStream", () => {
             const _pushPageValuesSpy = sandbox.spy(resultStream as any, "_pushPageValues");
             resultStream._read();
             sinon.assert.calledOnce(_pushPageValuesSpy);
-            chai.assert.isTrue(resultStream["_isPushingData"])
+            chai.assert.isTrue(resultStream["_isPushingData"]);
         });
 
         it("should throw ClientException when closed", () => {
