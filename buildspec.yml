@@ -8,8 +8,53 @@ phases:
     runtime-versions: 
       nodejs: 8
       nodejs: 10
+  pre_build: 
+    commands: 
+      - echo Installing source NPM dependencies... 
+      - npm install 
   build: 
-    commands:
+    commands: 
+      - echo Build started on `date` 
+      - branch=$CODEBUILD_SOURCE_VERSION
+      - echo Using branch $branch of target repositories
+      - echo Compiling the Node.js code
+      - npm run build
+      - echo Running tests
+      - npm test
+      - echo Symlinking driver
+      - npm link
+
+  post_build: 
+    commands: 
+      - echo Build completed on `date` 
+      - echo Running contract tests
+      - cd ..
+      - echo Cloning sample app
+      - git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/AWSNodeLedgerTutorialCode
+      - cd AWSNodeLedgerTutorialCode
+      - git rev-parse --quiet --verify $branch && git checkout $branch || git checkout -b $branch
+      - npm link amazon-qldb-driver-nodejs
+      - npm install
+
+      - echo Building sample app
+      - npm run build
+
+      - cd ..
+
+      - echo Cloning contract tests
+      - git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/AWSNodeLedgerContractTests
+      - cd AWSNodeLedgerContractTests
+      - git rev-parse --quiet --verify $branch && git checkout $branch || git checkout -b $branch
+      - npm install ../AWSNodeLedgerTutorialCode
+      - npm install
+
+      - echo Running contract tests on Node v10
       - node -v
-      - n 8.0.0
+      - npm run test
+
+      - echo Running contract tests on Node v8
+      - n 8.10.0
       - node -v
+      - npm run test
+
+      - echo Contract tests completed on `date`
