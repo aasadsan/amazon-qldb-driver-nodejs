@@ -6,9 +6,9 @@ env:
 phases: 
   install: 
     runtime-versions: 
-      nodejs: 8
-      nodejs: 12
+      nodejs: 8.10
       nodejs: 10
+      nodejs: 12
   pre_build: 
     commands: 
       - echo Installing source NPM dependencies... 
@@ -49,12 +49,13 @@ phases:
       - npm install ../AWSNodeLedgerTutorialCode
       - npm install
 
-      - echo Running contract tests on Node v10
+      - echo Running contract tests on Node v8.10
+      - n 8.10.0
       - node -v
       - npm run test
 
-      - echo Running contract tests on Node v8
-      - n 8.10.0
+      - echo Running contract tests on Node v10
+      - n 10.0.0
       - node -v
       - npm run test
 
