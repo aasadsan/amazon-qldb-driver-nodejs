@@ -7,6 +7,7 @@ phases:
   install: 
     runtime-versions: 
       nodejs: 8
+      nodejs: 12
       nodejs: 10
   pre_build: 
     commands: 
@@ -54,6 +55,11 @@ phases:
 
       - echo Running contract tests on Node v8
       - n 8.10.0
+      - node -v
+      - npm run test
+
+      - echo Running contract tests on Node v12
+      - n 12.0.0
       - node -v
       - npm run test
 
