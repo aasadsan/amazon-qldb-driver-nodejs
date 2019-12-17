@@ -9,7 +9,7 @@ phases:
       nodejs: 8
       nodejs: 10
   build: 
-      node -v
-      n 8.0.0
-      node -v
- 
+    commands:
+      - node -v
+      - n 8.0.0
+      - node -v
