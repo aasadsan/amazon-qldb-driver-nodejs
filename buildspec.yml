@@ -47,7 +47,19 @@ phases:
       - npm install ../AWSNodeLedgerTutorialCode
       - npm install
 
-      - echo Running contract tests
+      - echo Running contract tests on Node v8.10
+      - n 8.10.0
+      - node -v
+      - npm run test
+
+      - echo Running contract tests on Node v10
+      - n 10.0.0
+      - node -v
+      - npm run test
+
+      - echo Running contract tests on Node v12
+      - n 12.0.0
+      - node -v
       - npm run test
 
       - echo Contract tests completed on `date`
