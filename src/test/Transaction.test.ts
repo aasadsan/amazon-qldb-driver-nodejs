@@ -42,6 +42,7 @@ const sandbox = sinon.createSandbox();
 
 const testMessage: string = "foo";
 const testStatement: string = "SELECT * FROM foo";
+const testStatementWithQuotes: string = `SELECT * FROM "foo"`;
 const testPageToken: PageToken = "foo";
 const testTransactionId: string = "txnId";
 const testHash: Uint8Array = new Uint8Array([1, 2, 3]);
@@ -361,6 +362,35 @@ describe("Transaction", () => {
 
             sinon.assert.calledThrice(toQldbHashSpy);
             sinon.assert.calledWith(toQldbHashSpy, testStatement);
+            sinon.assert.calledWith(toQldbHashSpy, qldbWriter1.getBytes());
+            sinon.assert.calledWith(toQldbHashSpy, qldbWriter2.getBytes());
+
+            chai.assert.equal(ionJs.toBase64(transaction["_txnHash"].getQldbHash()), ionJs.toBase64(updatedHash));
+            chai.assert.equal(testExecuteStatementResult, result);
+
+        });
+
+        it("should compute hashes correctly when called from string with quotes", async () => {
+            const qldbWriter1: QldbWriter = createQldbWriter();
+            const qldbWriter2: QldbWriter = createQldbWriter();
+
+            const parameters: QldbWriter[] = [qldbWriter1, qldbWriter2];
+
+            let testStatementHash: QldbHash = QldbHash.toQldbHash(testStatementWithQuotes);
+            parameters.forEach((writer: QldbWriter) => {
+                testStatementHash = testStatementHash.dot(QldbHash.toQldbHash(writer.getBytes()));
+            });
+            const updatedHash: Uint8Array = transaction["_txnHash"].dot(testStatementHash).getQldbHash();
+
+            const toQldbHashSpy = sandbox.spy(QldbHash, "toQldbHash");
+
+            const result: ExecuteStatementResult = await transaction["_sendExecute"](
+                testStatementWithQuotes,
+                parameters
+            );
+
+            sinon.assert.calledThrice(toQldbHashSpy);
+            sinon.assert.calledWith(toQldbHashSpy, testStatementWithQuotes);
             sinon.assert.calledWith(toQldbHashSpy, qldbWriter1.getBytes());
             sinon.assert.calledWith(toQldbHashSpy, qldbWriter2.getBytes());
 
