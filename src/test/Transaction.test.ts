@@ -370,7 +370,7 @@ describe("Transaction", () => {
 
         });
 
-        it("should compute hashes correctly when called from string with quotes", async () => {
+        it("should compute hashes correctly when called from statement with quotes", async () => {
             const qldbWriter1: QldbWriter = createQldbWriter();
             const qldbWriter2: QldbWriter = createQldbWriter();
 
@@ -397,6 +397,22 @@ describe("Transaction", () => {
             chai.assert.equal(ionJs.toBase64(transaction["_txnHash"].getQldbHash()), ionJs.toBase64(updatedHash));
             chai.assert.equal(testExecuteStatementResult, result);
 
+        });
+
+        it("should compute different hashes correctly when called from different statements with quotes", async () => {
+            const firstStatement: string = `INSERT INTO "first_table" VALUE {'test': 'hello world'}`;
+            const secondStatement: string = `INSERT INTO "second_table" VALUE {'test': 'hello world'}`;
+
+            const firstStatementHash: QldbHash = QldbHash.toQldbHash(firstStatement);
+            const secondStatementHash: QldbHash = QldbHash.toQldbHash(secondStatement);
+
+            // If different statements that contain quotes are hashed incorrectly, then the hash of
+            // 92Hs4IGd3Gnq4O9sVQX/S0AanTKWolpiAXzv+9GLzP0= will be produced every time.
+            // It's asserted here that the hashes are different and computed correctly.
+            chai.assert.notEqual(
+                ionJs.toBase64(firstStatementHash.getQldbHash()),
+                ionJs.toBase64(secondStatementHash.getQldbHash())
+            );
         });
 
         it("should convert QldbWriters to ValueHolders correctly when called", async () => {
