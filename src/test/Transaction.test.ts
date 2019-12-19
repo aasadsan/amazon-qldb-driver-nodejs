@@ -407,7 +407,7 @@ describe("Transaction", () => {
             const secondStatementHash: QldbHash = QldbHash.toQldbHash(secondStatement);
 
             // If the different statements that contain quotes are hashed incorrectly, then the hash of
-            // 92Hs4IGd3Gnq4O9sVQX/S0AanTKWolpiAXzv+9GLzP0= will be produced every time.
+            // 92Hs4IGd3Gnq4O9sVQX/S0AanTKWolpiAXzv+9GLzP0= would be produced every time.
             // It's asserted here that the hashes are different and computed correctly.
             chai.assert.notEqual(
                 ionJs.toBase64(firstStatementHash.getQldbHash()),
