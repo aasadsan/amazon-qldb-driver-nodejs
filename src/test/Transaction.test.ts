@@ -334,7 +334,7 @@ describe("Transaction", () => {
     });
 
     describe("#_sendExecute()", () => {
-        it("should return a rejected promise when called after commmit() called", async () => {
+        it("should return a rejected promise when called after commit() called", async () => {
             await transaction.commit();
             await chai.expect(transaction["_sendExecute"](testStatement, [])).to.be.rejected;
         });
@@ -370,7 +370,7 @@ describe("Transaction", () => {
 
         });
 
-        it("should compute hashes correctly when called from statement with quotes", async () => {
+        it("should compute hashes correctly when called from a statement that contain quotes", async () => {
             const qldbWriter1: QldbWriter = createQldbWriter();
             const qldbWriter2: QldbWriter = createQldbWriter();
 
@@ -399,14 +399,14 @@ describe("Transaction", () => {
 
         });
 
-        it("should compute different hashes correctly when called from different statements with quotes", async () => {
+        it("should compute different hashes when called from different statements that contain quotes", async () => {
             const firstStatement: string = `INSERT INTO "first_table" VALUE {'test': 'hello world'}`;
             const secondStatement: string = `INSERT INTO "second_table" VALUE {'test': 'hello world'}`;
 
             const firstStatementHash: QldbHash = QldbHash.toQldbHash(firstStatement);
             const secondStatementHash: QldbHash = QldbHash.toQldbHash(secondStatement);
 
-            // If different statements that contain quotes are hashed incorrectly, then the hash of
+            // If the different statements that contain quotes are hashed incorrectly, then the hash of
             // 92Hs4IGd3Gnq4O9sVQX/S0AanTKWolpiAXzv+9GLzP0= will be produced every time.
             // It's asserted here that the hashes are different and computed correctly.
             chai.assert.notEqual(
