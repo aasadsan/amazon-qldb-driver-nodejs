@@ -415,6 +415,19 @@ describe("Transaction", () => {
             );
         });
 
+        it("should have different hashes when called from same statements, one with quotes one without", async () => {
+            const firstStatement: string = `INSERT INTO "first_table" VALUE {'test': 'hello world'}`;
+            const secondStatement: string = `INSERT INTO first_table VALUE {'test': 'hello world'}`;
+
+            const firstStatementHash: QldbHash = QldbHash.toQldbHash(firstStatement);
+            const secondStatementHash: QldbHash = QldbHash.toQldbHash(secondStatement);
+
+            chai.assert.notEqual(
+                ionJs.toBase64(firstStatementHash.getQldbHash()),
+                ionJs.toBase64(secondStatementHash.getQldbHash())
+            );
+        });
+
         it("should convert QldbWriters to ValueHolders correctly when called", async () => {
             const qldbWriter1: QldbWriter = createQldbWriter();
             const qldbWriter2: QldbWriter = createQldbWriter();
