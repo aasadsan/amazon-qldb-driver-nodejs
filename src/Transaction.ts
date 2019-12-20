@@ -156,7 +156,7 @@ export class Transaction {
     private _internalClose(): void {
         this._isClosed = true;
         while (this._resultStreams.length !== 0) {
-            this._resultStreams.pop().close();
+            this._resultStreams.pop().destroy();
         }
     }
 
