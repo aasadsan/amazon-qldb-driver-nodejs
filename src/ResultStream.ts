@@ -33,7 +33,6 @@ export class ResultStream extends Readable {
     private _lastRetrievedIndex: number;
     private _isClosed: boolean;
     private _lock: Lock;
-    private _isPushingData: boolean;
 
     /**
      * Create a ResultStream.
@@ -50,7 +49,6 @@ export class ResultStream extends Readable {
         this._lastRetrievedIndex = 0;
         this._isClosed = false;
         this._lock = new Lock();
-        this._isPushingData = false;
     }
 
     /**
@@ -70,10 +68,6 @@ export class ResultStream extends Readable {
         if (this._isClosed) {
             throw new ClientException("Result stream is closed. Cannot stream data.");
         }
-        if (this._isPushingData) {
-            return;
-        }
-        this._isPushingData = true;
         this._pushPageValues();
     }
 
@@ -84,25 +78,18 @@ export class ResultStream extends Readable {
      */
     private async _pushPageValues(): Promise<void> {
         await this._lock.acquire();
-        let canPush: boolean = true;
         try {
             if (this._shouldPushCachedPage) {
                 this._shouldPushCachedPage = false;
             } else if (this._cachedPage.NextPageToken) {
-                try {
-                    const fetchPageResult: FetchPageResult = 
-                        await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
-                    this._cachedPage = fetchPageResult.Page;
-                    this._lastRetrievedIndex = 0;
-                } catch (e) {
-                    this._isClosed = true;
-                    throw e;
-                }
+                const fetchPageResult: FetchPageResult = 
+                    await this._communicator.fetchPage(this._txnId, this._cachedPage.NextPageToken);
+                this._cachedPage = fetchPageResult.Page;
+                this._lastRetrievedIndex = 0;
             }
             for (let i: number = this._lastRetrievedIndex; i < this._cachedPage.Values.length; i++) {
                 const reader: Reader = makeReader(Result._handleBlob(this._cachedPage.Values[i].IonBinary));
-                canPush = this.push(reader);
-                if (!canPush) {
+                if (!this.push(reader)) {
                     this._lastRetrievedIndex = i;
                     this._shouldPushCachedPage = this._lastRetrievedIndex < this._cachedPage.Values.length;
                     return;
@@ -114,11 +101,6 @@ export class ResultStream extends Readable {
             }
         } finally {
             this._lock.release();
-            this._isPushingData = false;
-
-            if (!this._isClosed && canPush) {
-                this._read();
-            }
         }
     }
 }
