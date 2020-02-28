@@ -15,7 +15,7 @@ import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 import { globalAgent } from "http";
 import Semaphore from "semaphore-async-await";
 
-import { DriverClosedError, SessionPoolEmptyError } from "./errors/Errors";
+import { SessionPoolEmptyError } from "./errors/Errors";
 import { debug } from "./LogUtil";
 import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbDriver } from "./QldbDriver";
@@ -116,9 +116,7 @@ export class PooledQldbDriver extends QldbDriver {
      * @throws {@linkcode SessionPoolEmptyError} if the timeout is reached while attempting to retrieve a session.
      */
     async getSession(): Promise<QldbSession> {
-        if (this._isClosed) {
-            throw new DriverClosedError();
-        }
+        this._throwIfClosed();
         debug(
             `Getting session. Current free session count: ${this._sessionPool.length}. ` +
             `Currently available permit count: ${this._availablePermits}.`

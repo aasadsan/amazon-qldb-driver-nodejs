@@ -5,6 +5,7 @@ export {
     isResourceNotFoundException,
     isResourcePreconditionNotMetException
 } from "./src/errors/Errors";
+export { Executable } from "./src/Executable";
 export { PooledQldbDriver } from "./src/PooledQldbDriver";
 export { QldbDriver } from "./src/QldbDriver";
 export { QldbSession } from "./src/QldbSession";

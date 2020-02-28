@@ -23,6 +23,8 @@ import * as sinon from "sinon";
 import { DriverClosedError } from "../errors/Errors";
 import { QldbDriver } from "../QldbDriver";
 import { QldbSession } from "../QldbSession";
+import { Result } from "../Result";
+import { TransactionExecutor } from "../TransactionExecutor";
 
 chai.use(chaiAsPromised);
 const sandbox = sinon.createSandbox();
@@ -38,6 +40,17 @@ const testSendCommandResult: SendCommandResult = {
         SessionToken: "sessionToken"
     }
 };
+const mockResult: Result = <Result><any> sandbox.mock(Result);
+const mockQldbSession: QldbSession = <QldbSession><any> sandbox.mock(QLDBSession);
+mockQldbSession.executeLambda = async () => {
+    return mockResult;
+}
+mockQldbSession.executeStatement = async () => {
+    return mockResult;
+}
+mockQldbSession.close = () => {
+    return;
+}
 
 let qldbDriver: QldbDriver;
 let sendCommandStub;
@@ -81,6 +94,72 @@ describe("QldbDriver", () => {
         it("should close qldbDriver when called", () => {
             qldbDriver.close();
             chai.assert.equal(qldbDriver["_isClosed"], true);
+        });
+    });
+
+    describe("#executeLambda()", () => {
+        it("should start a session and return the delegated call to the session", async () => {
+            const getSessionStub = sandbox.stub(qldbDriver, "getSession");
+            getSessionStub.returns(Promise.resolve(mockQldbSession));
+            const executeLambdaSpy = sandbox.spy(mockQldbSession, "executeLambda");
+            const closeSessionSpy = sandbox.spy(mockQldbSession, "close");
+            const lambda = (transactionExecutor: TransactionExecutor) => {
+                return true;
+            };
+            const retryIndicator = (retry: number) => {
+                return;
+            };
+            const result = await qldbDriver.executeLambda(lambda, retryIndicator);
+
+            chai.assert.equal(result, mockResult);
+            sinon.assert.calledOnce(executeLambdaSpy);
+            sinon.assert.calledWith(executeLambdaSpy, lambda, retryIndicator);
+            sinon.assert.calledOnce(closeSessionSpy);
+        });
+
+        it("should throw DriverClosedError wrapped in a rejected promise when closed", async () => {
+            const lambda = (transactionExecutor: TransactionExecutor) => {
+                return true;
+            };
+            const retryIndicator = (retry: number) => {
+                return;
+            };
+            
+            qldbDriver["_isClosed"] = true;
+            const error = await chai.expect(qldbDriver.executeLambda(lambda, retryIndicator)).to.be.rejected;
+            chai.assert.instanceOf(error, DriverClosedError);
+        });
+    });
+
+    describe("#executeStatement()", () => {
+        it("should start a session and return the delegated call to the session", async () => {
+            const getSessionStub = sandbox.stub(qldbDriver, "getSession");
+            getSessionStub.returns(Promise.resolve(mockQldbSession));
+            const executeStatementSpy = sandbox.spy(mockQldbSession, "executeStatement");
+            const closeSessionSpy = sandbox.spy(mockQldbSession, "close");
+            const statement = "statement";
+            const parameters = [];
+            const retryIndicator = (retry: number) => {
+                return;
+            };
+            const result = await qldbDriver.executeStatement(statement, parameters, retryIndicator);
+
+            chai.assert.equal(result, mockResult);
+            sinon.assert.calledOnce(executeStatementSpy);
+            sinon.assert.calledWith(executeStatementSpy, statement, parameters, retryIndicator);
+            sinon.assert.calledOnce(closeSessionSpy);
+        });
+
+        it("should throw DriverClosedError wrapped in a rejected promise when closed", async () => {
+            const statement = "statement";
+            const parameters = [];
+            const retryIndicator = (retry: number) => {
+                return;
+            };
+            
+            qldbDriver["_isClosed"] = true;
+            const error = await chai.expect(qldbDriver.executeStatement(statement, parameters, retryIndicator)).to.be.rejected;
+            chai.assert.instanceOf(error, DriverClosedError);
         });
     });
 
