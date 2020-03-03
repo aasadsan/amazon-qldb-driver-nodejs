@@ -26,7 +26,7 @@ import {
 } from "aws-sdk/clients/qldbsession";
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
-import { makeReader, Reader } from "ion-js";
+import { dom } from "ion-js";
 import * as sinon from "sinon";
 import { Readable } from "stream";
 import { format } from "util";
@@ -445,20 +445,20 @@ describe("QldbSession", () => {
     });
 
     describe("#_tableNameHelper()", () => {
-        it("should return a list of table names when called with a Stream containing valid Readers", async () => {
+        it("should return a list of table names when called with a Stream containing valid values", async () => {
             const value1: ValueHolder = {IonBinary: format("{ name:\"%s\" }", testTableNames[0])};
             const value2: ValueHolder = {IonBinary: format("{ name:\"%s\" }", testTableNames[1])};
-            const readers: Reader[] = [
-                makeReader(Result._handleBlob(value1.IonBinary)),
-                makeReader(Result._handleBlob(value2.IonBinary))
+            const values: dom.Value[] = [
+                dom.load(Result._handleBlob(value1.IonBinary)),
+                dom.load(Result._handleBlob(value2.IonBinary))
             ];
             let eventCount: number = 0;
             const mockResultStream: Readable = new Readable({
                 objectMode: true,
                 read: function(size) {
-                    if (eventCount < readers.length) {
+                    if (eventCount < values.length) {
                         eventCount += 1;
-                        return this.push(readers[eventCount-1]);
+                        return this.push(values[eventCount-1]);
                     } else {
                         return this.push(null);
                     }
@@ -470,16 +470,16 @@ describe("QldbSession", () => {
             });
         });
 
-        it("should return a rejected promise when called with a Stream containing Readers with no struct", async () => {
+        it("should return a rejected promise when called with a Stream containing values with no struct", async () => {
             const value1: ValueHolder = {IonBinary: "notAStruct"};
-            const readers: Reader[] = [makeReader(Result._handleBlob(value1.IonBinary))];
+            const values: dom.Value[] = [dom.load(Result._handleBlob(value1.IonBinary))];
             let eventCount: number = 0;
             const mockResultStream: Readable = new Readable({
                 objectMode: true,
                 read: function(size) {
-                    if (eventCount < readers.length) {
+                    if (eventCount < values.length) {
                         eventCount += 1;
-                        return this.push(readers[eventCount-1]);
+                        return this.push(values[eventCount-1]);
                     } else {
                         return this.push(null);
                     }
@@ -490,16 +490,16 @@ describe("QldbSession", () => {
             chai.assert.equal(error.name, "ClientException");
         });
 
-        it("should return a rejected promise when called with a Stream containing Readers with no string", async () => {
-            const value1: ValueHolder = {IonBinary: "{ structKeyName:1 }"};
-            const readers: Reader[] = [makeReader(Result._handleBlob(value1.IonBinary))];
+        it("should return a rejected promise when called with a Stream containing values with no string", async () => {
+            const value1: ValueHolder = {IonBinary: "{ name:1 }"};
+            const values: dom.Value[] = [dom.load(Result._handleBlob(value1.IonBinary))];
             let eventCount: number = 0;
             const mockResultStream: Readable = new Readable({
                 objectMode: true,
                 read: function(size) {
-                    if (eventCount < readers.length) {
+                    if (eventCount < values.length) {
                         eventCount += 1;
-                        return this.push(readers[eventCount-1]);
+                        return this.push(values[eventCount-1]);
                     } else {
                         return this.push(null);
                     }
