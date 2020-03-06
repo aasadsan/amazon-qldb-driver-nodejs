@@ -17,13 +17,9 @@ import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 import { version } from "../package.json";
 import { Communicator } from "./Communicator";
 import { DriverClosedError } from "./errors/Errors";
-import { Executable } from "./Executable.js";
 import { debug } from "./LogUtil";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
-import { QldbWriter } from "./QldbWriter.js";
-import { Result } from "./Result";
-import { TransactionExecutor } from "./TransactionExecutor.js";
 
 /**
  * Represents a factory for creating sessions to a specific ledger within QLDB. This class or
@@ -35,7 +31,7 @@ import { TransactionExecutor } from "./TransactionExecutor.js";
  * This factory does not attempt to re-use or manage sessions in any way. It is recommended to use
  * {@linkcode PooledQldbDriver} for both less resource usage and lower latency.
  */
-export class QldbDriver implements Executable {
+export class QldbDriver {
     protected _qldbClient: QLDBSession;
     protected _ledgerName: string;
     protected _retryLimit: number;
@@ -68,61 +64,6 @@ export class QldbDriver implements Executable {
      */
     close(): void {
         this._isClosed = true;
-    }
-
-    /**
-     * Implicitly start a transaction within a new session, execute the lambda, commit the transaction, and close the
-     * session, retrying up to the retry limit if an OCC conflict or retriable exception occurs.
-     *
-     * @param queryLambda A lambda representing the block of code to be executed within the transaction. This cannot
-     *                    have any side effects as it may be invoked multiple times, and the result cannot be trusted
-     *                    until the transaction is committed.
-     * @param retryIndicator An optional lambda that is invoked when the `querylambda` is about to be retried due to an
-     *                       OCC conflict or retriable exception.
-     * @returns Promise which fulfills with the return value of the `queryLambda` which could be a {@linkcode Result}
-     *          on the result set of a statement within the lambda.
-     * @throws {@linkcode DriverClosedError} when this driver is closed.
-     */
-    async executeLambda(
-        queryLambda: (transactionExecutor: TransactionExecutor) => any,
-        retryIndicator?: (retryAttempt: number) => void
-    ): Promise<any> {
-        let session: QldbSession = null;
-        try  {
-            session = await this.getSession();
-            return await session.executeLambda(queryLambda, retryIndicator);
-        } finally {
-            if (session != null) {
-                session.close();
-            }
-        }
-    }
-
-    /**
-     * Implicitly start a transaction within a new session, execute the statement, commit the transaction, and close the
-     * session, retrying up to the retry limit if an OCC conflict or retriable exception occurs.
-     *
-     * @param statement The statement to execute.
-     * @param parameters An optional list of QLDB writers containing Ion values to execute.
-     * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an
-     *                       OCC conflict or retriable exception.
-     * @returns Promise which fulfills with a Result.
-     * @throws {@linkcode DriverClosedError} when this driver is closed.
-     */
-    async executeStatement(
-        statement: string,
-        parameters: QldbWriter[] = [],
-        retryIndicator?: (retryAttempt: number) => void
-    ): Promise<Result> {
-        let session: QldbSession = null;
-        try  {
-            session = await this.getSession();
-            return await session.executeStatement(statement, parameters, retryIndicator);
-        } finally {
-            if (session != null) {
-                session.close();
-            }
-        }
     }
 
     /**
