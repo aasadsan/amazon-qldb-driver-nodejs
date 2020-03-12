@@ -95,8 +95,8 @@ describe("Result", () => {
 
             resultList.forEach((result, i) => {
                 chai.assert.equal(
-                    JSON.stringify(result),
-                    JSON.stringify(allValues[i].IonBinary)
+                    result,
+                    allValues[i].IonBinary
                 );
             });
         });
@@ -210,15 +210,15 @@ describe("Result", () => {
             chai.assert.equal(allValues.length + testValueHolder.length, resultList.length);
             // Need to check if the initial Page's value and the first element in resultList is equivalent.
             chai.assert.equal(
-                JSON.stringify(resultList[0]),
-                JSON.stringify(testValueHolder[0].IonBinary)
+                resultList[0],
+                testValueHolder[0].IonBinary
             );
 
             // Now check if the rest of the resultList matches up with the Page's values returned from the Communicator.
             for (let i = 0; i < allValues.length; i++) {
                 chai.assert.equal(
-                    JSON.stringify(resultList[i+1]),
-                    JSON.stringify(allValues[i].IonBinary)
+                    resultList[i+1],
+                    allValues[i].IonBinary
                 );
             }
         });
@@ -253,8 +253,8 @@ describe("Result", () => {
             chai.assert.equal(values.length, resultList.length);
             resultList.forEach((result, i) => {
                 chai.assert.equal(
-                    JSON.stringify(result),
-                    JSON.stringify(values[i])
+                    result,
+                    values[i]
                 );
             });
         });

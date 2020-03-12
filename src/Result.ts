@@ -26,7 +26,7 @@ export class Result {
 
     /**
      * Creates a Result.
-     * @param resultList A list of Ion values containing the statement execution returned from QLDB.
+     * @param resultList A list of Ion values containing the statement execution's result returned from QLDB.
      */
     private constructor(resultList: dom.Value[]) {
         this._resultList = resultList;

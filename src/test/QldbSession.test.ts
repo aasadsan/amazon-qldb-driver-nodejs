@@ -445,7 +445,7 @@ describe("QldbSession", () => {
     });
 
     describe("#_tableNameHelper()", () => {
-        it("should return a list of table names when called with a Stream containing valid values", async () => {
+        it("should return a list of table names when called with a Stream containing valid Ion values", async () => {
             const value1: ValueHolder = {IonBinary: format("{ name:\"%s\" }", testTableNames[0])};
             const value2: ValueHolder = {IonBinary: format("{ name:\"%s\" }", testTableNames[1])};
             const values: dom.Value[] = [
