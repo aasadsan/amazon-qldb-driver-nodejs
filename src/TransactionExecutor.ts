@@ -14,7 +14,6 @@
 import { Readable } from "stream";
 
 import { LambdaAbortedError } from "./errors/Errors";
-import { QldbWriter } from "./QldbWriter";
 import { Result } from "./Result";
 import { Transaction } from "./Transaction";
 
@@ -43,22 +42,24 @@ export class TransactionExecutor {
     /**
      * Execute the specified statement in the current transaction.
      * @param statement The statement to execute.
-     * @param parameters An optional list of QLDB writers containing Ion values to execute.
+     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a Result.
      * @throws {@linkcode TransactionClosedError} when the transaction is closed.
      */
-    async executeInline(statement: string, parameters: QldbWriter[] = []): Promise<Result> {
+    async executeInline(statement: string, parameters: any[] = []): Promise<Result> {
         return await this._transaction.executeInline(statement, parameters);
     }
 
     /**
      * Execute the specified statement in the current transaction.
      * @param statement The statement to execute.
-     * @param parameters An optional list of QLDB writers containing Ion values to execute.
+     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a ResultStream.
      * @throws {@linkcode TransactionClosedError} when the transaction is closed.
      */
-    async executeStream(statement: string, parameters: QldbWriter[] = []): Promise<Readable> {
+    async executeStream(statement: string, parameters: any[] = []): Promise<Readable> {
         return await this._transaction.executeStream(statement, parameters);
     }
 

@@ -12,7 +12,6 @@
  */
 
 import { Result } from "./Result";
-import { QldbWriter } from "./QldbWriter";
 import { TransactionExecutor } from "./TransactionExecutor";
 
 /**
@@ -39,12 +38,13 @@ export interface Executable {
      * OCC conflict or retriable exception occurs.
      * 
      * @param statement The statement to execute.
-     * @param parameters An optional list of QLDB writers containing Ion values to execute.
+     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     *                   filling in parameters of the statement.
      * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an 
      *                       OCC conflict or retriable exception.
      * @returns Promise which fulfills with a Result.
      */
     executeStatement: (statement: string,
-                       parameters?: QldbWriter[],
+                       parameters?: any[],
                        retryIndicator?: (retryAttempt: number) => void) => Promise<Result>;
 }

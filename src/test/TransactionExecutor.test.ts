@@ -14,13 +14,12 @@
 // Test environment imports
 import "mocha";
 
-import { makeBinaryWriter, Writer } from "ion-js";
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
+import { dom, makeBinaryWriter, Writer } from "ion-js";
 import * as sinon from "sinon";
 
 import { LambdaAbortedError } from "../errors/Errors";
-import { createQldbWriter, QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
@@ -81,13 +80,12 @@ describe("TransactionExecutor", () => {
             mockTransaction.executeInline = async () => {
                 return mockResult;
             };
-            const qldbWriter: QldbWriter = createQldbWriter();
 
             const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
-            const result = await transactionExecutor.executeInline(testStatement, [qldbWriter]);
+            const result = await transactionExecutor.executeInline(testStatement, ["a"]);
             chai.assert.equal(mockResult, result);
             sinon.assert.calledOnce(transactionExecuteSpy);
-            sinon.assert.calledWith(transactionExecuteSpy, testStatement, [qldbWriter]);
+            sinon.assert.calledWith(transactionExecuteSpy, testStatement, ["a"]);
         });
 
         it("should return a rejected promise when error is thrown", async () => {
@@ -119,13 +117,11 @@ describe("TransactionExecutor", () => {
                 return mockResultStream;
             };
 
-            const qldbWriter: QldbWriter = createQldbWriter();
-
             const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
-            const resultStream = await transactionExecutor.executeStream(testStatement, [qldbWriter]);
+            const resultStream = await transactionExecutor.executeStream(testStatement, [5]);
             chai.assert.equal(mockResultStream, resultStream);
             sinon.assert.calledOnce(transactionExecuteSpy);
-            sinon.assert.calledWith(transactionExecuteSpy, testStatement, [qldbWriter]);
+            sinon.assert.calledWith(transactionExecuteSpy, testStatement, [5]);
         });
 
         it("should return a rejected promise when error is thrown", async () => {

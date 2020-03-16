@@ -308,11 +308,11 @@ describe("QldbSession", () => {
                 return mockTransaction;
             };
 
-            const mockQldbWriter = <QldbWriter><any>sandbox.mock(createQldbWriter);
+            const parameter: dom.Value = dom.Value.from(5);
             const executeInlineSpy = sandbox.spy(mockTransaction, "executeInline");
-            const result: Result = await qldbSession.executeStatement(testStatement, [mockQldbWriter]);
+            const result: Result = await qldbSession.executeStatement(testStatement, [parameter]);
             chai.assert.equal(result, mockResult);
-            sinon.assert.calledWith(executeInlineSpy, testStatement, [mockQldbWriter]);
+            sinon.assert.calledWith(executeInlineSpy, testStatement, [parameter]);
         });
     });
 

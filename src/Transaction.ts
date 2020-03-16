@@ -12,7 +12,7 @@
  */
 
 import { CommitTransactionResult, ExecuteStatementResult, ValueHolder } from "aws-sdk/clients/qldbsession";
-import { toBase64 } from "ion-js";
+import { dom, makeBinaryWriter, toBase64 } from "ion-js";
 import { Lock } from "semaphore-async-await";
 import { Readable } from "stream";
 
@@ -20,7 +20,6 @@ import { Communicator } from "./Communicator";
 import { ClientException, isOccConflictException, TransactionClosedError } from "./errors/Errors";
 import { warn } from "./LogUtil";
 import { QldbHash } from "./QldbHash";
-import { QldbWriter } from "./QldbWriter";
 import { Result } from "./Result";
 import { ResultStream } from "./ResultStream";
 
@@ -116,10 +115,11 @@ export class Transaction {
     /**
      * Execute the specified statement in the current transaction.
      * @param statement A statement to execute against QLDB as a string.
-     * @param parameters An optional list of QLDB writers containing Ion values to execute against QLDB.
+     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a fully-buffered Result.
      */
-    async executeInline(statement: string, parameters: QldbWriter[] = []): Promise<Result> {
+    async executeInline(statement: string, parameters: any[] = []): Promise<Result> {
         const result: ExecuteStatementResult = await this._sendExecute(statement, parameters);
         const inlineResult = Result.create(this._txnId, result.FirstPage, this._communicator);
         return inlineResult;
@@ -128,10 +128,11 @@ export class Transaction {
     /**
      * Execute the specified statement in the current transaction.
      * @param statement A statement to execute against QLDB as a string.
-     * @param parameters An optional list of QLDB writers containing Ion values to execute against QLDB.
+     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a Readable.
      */
-    async executeStream(statement: string, parameters: QldbWriter[] = []): Promise<Readable> {
+    async executeStream(statement: string, parameters: any[] = []): Promise<Readable> {
         const result: ExecuteStatementResult = await this._sendExecute(statement, parameters);
         return new ResultStream(this._txnId, result.FirstPage, this._communicator);
     }
@@ -154,11 +155,12 @@ export class Transaction {
     /**
      * Helper method to execute statement against QLDB.
      * @param statement A statement to execute against QLDB as a string.
-     * @param parameters A list of QLDB writers containing Ion values to execute against QLDB.
+     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a ExecuteStatementResult object.
      * @throws {@linkcode TransactionClosedError} when transaction is closed.
      */
-    private async _sendExecute(statement: string, parameters: QldbWriter[]): Promise<ExecuteStatementResult> {
+    private async _sendExecute(statement: string, parameters: any[]): Promise<ExecuteStatementResult> {
         if (this._isClosed) {
             throw new TransactionClosedError();
         }
@@ -167,15 +169,12 @@ export class Transaction {
             await this._hashLock.acquire();
             let statementHash: QldbHash = QldbHash.toQldbHash(statement);
 
-            const valueHolderList: ValueHolder[] = parameters.map((writer: QldbWriter) => {
-                try {
-                    writer.close();
-                } catch (e) {
-                    warn(
-                        "Error encountered when attempting to close parameter writer. This warning can be ignored if " +
-                        `the writer was manually closed: ${e}.`
-                    );
-                }
+            const valueHolderList: ValueHolder[] = parameters.map((param: any) => {
+                //TODO: once dom.dump(value) is available, lines 174 to 179 should utilize the new wrapper method.
+                let writer = makeBinaryWriter();
+                dom.Value.from(param).writeTo(writer);
+                writer.close();
+
                 const ionBinary: Uint8Array = writer.getBytes();
                 statementHash = statementHash.dot(QldbHash.toQldbHash(ionBinary));
                 const valueHolder: ValueHolder = {

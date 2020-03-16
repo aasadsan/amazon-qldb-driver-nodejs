@@ -22,7 +22,6 @@ import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbDriver } from "./QldbDriver";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
-import { QldbWriter } from "./QldbWriter";
 import { TransactionExecutor } from "./TransactionExecutor";
 import { Result } from "./Result";
 
@@ -144,7 +143,8 @@ export class PooledQldbDriver extends QldbDriver implements Executable {
      * session, retrying up to the retry limit if an OCC conflict or retriable exception occurs.
      *
      * @param statement The statement to execute.
-     * @param parameters An optional list of QLDB writers containing Ion values to execute.
+     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     *                   filling in parameters of the statement.
      * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an
      *                       OCC conflict or retriable exception.
      * @returns Promise which fulfills with a Result.
@@ -152,7 +152,7 @@ export class PooledQldbDriver extends QldbDriver implements Executable {
      */
     async executeStatement(
         statement: string,
-        parameters: QldbWriter[] = [],
+        parameters: any[] = [],
         retryIndicator?: (retryAttempt: number) => void
     ): Promise<Result> {
         let session: QldbSession = null;

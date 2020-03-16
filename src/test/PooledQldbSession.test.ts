@@ -16,13 +16,13 @@ import "mocha";
 
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
+import { dom } from "ion-js";
 import * as sinon from "sinon";
 
 import * as LogUtil from "../LogUtil";
 import { SessionClosedError } from "../errors/Errors";
 import { PooledQldbSession } from "../PooledQldbSession";
 import { QldbSessionImpl } from "../QldbSessionImpl";
-import { createQldbWriter, QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
 import { Transaction } from "../Transaction";
 
@@ -98,7 +98,7 @@ describe("PooledQldbSession", () => {
     describe("#executeLambda()", () => {
         it("should return a Result object when called", async () => {
             const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
-            const query = async (txn) => {
+            const query = async (txn: any) => {
                 return await txn.executeInline(testStatement);
             };
             const retryIndicator = () => {};
@@ -140,11 +140,11 @@ describe("PooledQldbSession", () => {
 
         it("should return a Result object when provided with a statement and parameters", async () => {
             const executeSpy = sandbox.spy(mockQldbSession, "executeStatement");
-            const mockQldbWriter = <QldbWriter><any> sandbox.mock(createQldbWriter);
-            const result: Result = await pooledQldbSession.executeStatement(testStatement, [mockQldbWriter]);
+            const parameter: dom.Value = dom.Value.from(5);
+            const result: Result = await pooledQldbSession.executeStatement(testStatement, [parameter]);
             chai.assert.equal(result, mockResult);
             sinon.assert.calledOnce(executeSpy);
-            sinon.assert.calledWith(executeSpy, testStatement, [mockQldbWriter]);
+            sinon.assert.calledWith(executeSpy, testStatement, [parameter]);
         });
 
         it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
