@@ -233,6 +233,20 @@ describe("Transaction", () => {
             chai.assert.equal(result, mockResult);
         });
 
+        it("should properly map a list as a single parameter", async () => {
+            Result.create = async () => {
+                return mockResult
+            };
+            const sendExecuteSpy = sandbox.spy(transaction as any, "_sendExecute");
+            const param1: number = 5;
+            const param2: string = "a";
+            
+            const result: Result = await transaction.executeInline(testStatement, [param1, param2]);
+            sinon.assert.calledOnce(sendExecuteSpy);
+            sinon.assert.calledWith(sendExecuteSpy, testStatement, [[param1, param2]]);
+            chai.assert.equal(result, mockResult);
+        });
+
         it("should return a rejected promise when error is thrown", async () => {
             mockCommunicator.executeStatement = async () => {
                 throw new Error(testMessage);
