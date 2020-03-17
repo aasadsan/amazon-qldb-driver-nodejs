@@ -11,7 +11,6 @@
  * and limitations under the License.
  */
 
-import { Result } from "./Result";
 import { TransactionExecutor } from "./TransactionExecutor";
 
 /**
@@ -32,19 +31,4 @@ export interface Executable {
      */
     executeLambda: (queryLambda: (transactionExecutor: TransactionExecutor) => any,
                     retryIndicator?: (retryAttempt: number) => void) => Promise<any>;
-
-    /**
-     * Execute a statement within a new transaction, and commit the transaction, retrying up to the retry limit if an 
-     * OCC conflict or retriable exception occurs.
-     * 
-     * @param statement The statement to execute.
-     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
-     *                   filling in parameters of the statement.
-     * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an 
-     *                       OCC conflict or retriable exception.
-     * @returns Promise which fulfills with a Result.
-     */
-    executeStatement: (statement: string,
-                       parameters?: any[],
-                       retryIndicator?: (retryAttempt: number) => void) => Promise<Result>;
 }

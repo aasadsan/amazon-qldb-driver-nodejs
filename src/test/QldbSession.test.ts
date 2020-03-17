@@ -294,28 +294,6 @@ describe("QldbSession", () => {
         });
     });
 
-    describe("#executeStatement()", () => {
-        it("should return a Result object when provided with a statement", async () => {
-            const executeStub = sandbox.stub(qldbSession, "executeLambda");
-            executeStub.returns(Promise.resolve(mockResult));
-            const result: Result = await qldbSession.executeStatement(testStatement);
-            chai.assert.equal(result, mockResult);
-            sinon.assert.calledOnce(executeStub);
-        });
-
-        it("should return a Result object when provided with a statement and parameters", async () => {
-            qldbSession.startTransaction = async () => {
-                return mockTransaction;
-            };
-
-            const parameter: dom.Value = dom.Value.from(5);
-            const executeInlineSpy = sandbox.spy(mockTransaction, "executeInline");
-            const result: Result = await qldbSession.executeStatement(testStatement, [parameter]);
-            chai.assert.equal(result, mockResult);
-            sinon.assert.calledWith(executeInlineSpy, testStatement, [parameter]);
-        });
-    });
-
     describe("#getLedgerName()", () => {
         it("should return the ledger name when called", () => {
             const communicatorLedgerSpy = sandbox.spy(mockCommunicator, "getLedgerName");

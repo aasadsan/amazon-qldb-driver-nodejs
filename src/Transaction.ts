@@ -22,6 +22,7 @@ import { warn } from "./LogUtil";
 import { QldbHash } from "./QldbHash";
 import { Result } from "./Result";
 import { ResultStream } from "./ResultStream";
+import { TransactionExecutable } from "./TransactionExecutable";
 
 /**
  * A class representing a QLDB transaction.
@@ -41,7 +42,7 @@ import { ResultStream } from "./ResultStream";
  * When an OCC conflict occurs, the transaction is closed and must be handled manually by creating a new transaction
  * and re-executing the desired queries.
  */
-export class Transaction {
+export class Transaction implements TransactionExecutable {
     private _communicator: Communicator;
     private _txnId: string;
     private _isClosed: boolean;
@@ -115,11 +116,11 @@ export class Transaction {
     /**
      * Execute the specified statement in the current transaction.
      * @param statement A statement to execute against QLDB as a string.
-     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     * @param parameters Rest parameters of Ion values or JavaScript native types that are convertible to Ion for
      *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a fully-buffered Result.
      */
-    async executeInline(statement: string, parameters: any[] = []): Promise<Result> {
+    async executeInline(statement: string, ...parameters: any[]): Promise<Result> {
         const result: ExecuteStatementResult = await this._sendExecute(statement, parameters);
         const inlineResult = Result.create(this._txnId, result.FirstPage, this._communicator);
         return inlineResult;
@@ -128,11 +129,11 @@ export class Transaction {
     /**
      * Execute the specified statement in the current transaction.
      * @param statement A statement to execute against QLDB as a string.
-     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
+     * @param parameters Rest parameters of Ion values or JavaScript native types that are convertible to Ion for
      *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a Readable.
      */
-    async executeStream(statement: string, parameters: any[] = []): Promise<Readable> {
+    async executeStream(statement: string, ...parameters: any[]): Promise<Readable> {
         const result: ExecuteStatementResult = await this._sendExecute(statement, parameters);
         return new ResultStream(this._txnId, result.FirstPage, this._communicator);
     }

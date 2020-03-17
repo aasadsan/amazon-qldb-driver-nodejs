@@ -227,7 +227,7 @@ describe("Transaction", () => {
             const param1: number = 5;
             const param2: string = "a";
 
-            const result: Result = await transaction.executeInline(testStatement, [param1, param2]);
+            const result: Result = await transaction.executeInline(testStatement, param1, param2);
             sinon.assert.calledOnce(sendExecuteSpy);
             sinon.assert.calledWith(sendExecuteSpy, testStatement, [param1, param2]);
             chai.assert.equal(result, mockResult);
@@ -276,7 +276,7 @@ describe("Transaction", () => {
             const sendExecuteSpy = sandbox.spy(transaction as any, "_sendExecute");
             const param1: number = 5;
             const param2: string = "a";
-            const result: Readable = await transaction.executeStream(testStatement, [param1, param2]);
+            const result: Readable = await transaction.executeStream(testStatement, param1, param2);
             sinon.assert.calledOnce(sendExecuteSpy);
             sinon.assert.calledWith(sendExecuteSpy, testStatement, [param1, param2]);
             chai.assert.equal(JSON.stringify(result), JSON.stringify(sampleResultStreamObject));

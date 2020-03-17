@@ -23,7 +23,6 @@ import { QldbDriver } from "./QldbDriver";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
 import { TransactionExecutor } from "./TransactionExecutor";
-import { Result } from "./Result";
 
 /**
  * Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
@@ -131,34 +130,6 @@ export class PooledQldbDriver extends QldbDriver implements Executable {
         try  {
             session = await this.getSession();
             return await session.executeLambda(queryLambda, retryIndicator);
-        } finally {
-            if (session != null) {
-                session.close();
-            }
-        }
-    }
-
-    /**
-     * Implicitly start a transaction within a new session, execute the statement, commit the transaction, and close the
-     * session, retrying up to the retry limit if an OCC conflict or retriable exception occurs.
-     *
-     * @param statement The statement to execute.
-     * @param parameters An optional list of Ion values or JavaScript native types that are convertible to Ion for
-     *                   filling in parameters of the statement.
-     * @param retryIndicator An optional lambda that is invoked when the `statement` is about to be retried due to an
-     *                       OCC conflict or retriable exception.
-     * @returns Promise which fulfills with a Result.
-     * @throws {@linkcode DriverClosedError} when this driver is closed.
-     */
-    async executeStatement(
-        statement: string,
-        parameters: any[] = [],
-        retryIndicator?: (retryAttempt: number) => void
-    ): Promise<Result> {
-        let session: QldbSession = null;
-        try  {
-            session = await this.getSession();
-            return await session.executeStatement(statement, parameters, retryIndicator);
         } finally {
             if (session != null) {
                 session.close();

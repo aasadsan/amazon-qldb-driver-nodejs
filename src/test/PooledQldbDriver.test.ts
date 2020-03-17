@@ -64,9 +64,6 @@ const mockQldbSession: QldbSession = <QldbSession><any> sandbox.mock(QLDBSession
 mockQldbSession.executeLambda = async () => {
     return mockResult;
 }
-mockQldbSession.executeStatement = async () => {
-    return mockResult;
-}
 mockQldbSession.close = () => {
     return;
 }
@@ -182,38 +179,6 @@ describe("PooledQldbDriver", () => {
             
             pooledQldbDriver["_isClosed"] = true;
             const error = await chai.expect(pooledQldbDriver.executeLambda(lambda, retryIndicator)).to.be.rejected;
-            chai.assert.instanceOf(error, DriverClosedError);
-        });
-    });
-
-    describe("#executeStatement()", () => {
-        it("should start a session and return the delegated call to the session", async () => {
-            const getSessionStub = sandbox.stub(pooledQldbDriver, "getSession");
-            getSessionStub.returns(Promise.resolve(mockQldbSession));
-            const executeStatementSpy = sandbox.spy(mockQldbSession, "executeStatement");
-            const closeSessionSpy = sandbox.spy(mockQldbSession, "close");
-            const statement = "statement";
-            const parameters = [];
-            const retryIndicator = (retry: number) => {
-                return;
-            };
-            const result = await pooledQldbDriver.executeStatement(statement, parameters, retryIndicator);
-
-            chai.assert.equal(result, mockResult);
-            sinon.assert.calledOnce(executeStatementSpy);
-            sinon.assert.calledWith(executeStatementSpy, statement, parameters, retryIndicator);
-            sinon.assert.calledOnce(closeSessionSpy);
-        });
-
-        it("should throw DriverClosedError wrapped in a rejected promise when closed", async () => {
-            const statement = "statement";
-            const parameters = [];
-            const retryIndicator = (retry: number) => {
-                return;
-            };
-            
-            pooledQldbDriver["_isClosed"] = true;
-            const error = await chai.expect(pooledQldbDriver.executeStatement(statement, parameters, retryIndicator)).to.be.rejected;
             chai.assert.instanceOf(error, DriverClosedError);
         });
     });
