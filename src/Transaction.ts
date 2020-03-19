@@ -12,7 +12,7 @@
  */
 
 import { CommitTransactionResult, ExecuteStatementResult, ValueHolder } from "aws-sdk/clients/qldbsession";
-import { dom, makeBinaryWriter, toBase64 } from "ion-js";
+import { dumpBinary, toBase64 } from "ion-js";
 import { Lock } from "semaphore-async-await";
 import { Readable } from "stream";
 
@@ -171,12 +171,7 @@ export class Transaction implements TransactionExecutable {
             let statementHash: QldbHash = QldbHash.toQldbHash(statement);
 
             const valueHolderList: ValueHolder[] = parameters.map((param: any) => {
-                //TODO: once dom.dump(value) is available, lines 174 to 179 should utilize the new wrapper method.
-                let writer = makeBinaryWriter();
-                dom.Value.from(param).writeTo(writer);
-                writer.close();
-
-                const ionBinary: Uint8Array = writer.getBytes();
+                const ionBinary: Uint8Array = dumpBinary(param);
                 statementHash = statementHash.dot(QldbHash.toQldbHash(ionBinary));
                 const valueHolder: ValueHolder = {
                     IonBinary: ionBinary
