@@ -96,7 +96,7 @@ describe("PooledQldbSession", () => {
         it("should return a Result object when called", async () => {
             const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
             const query = async (txn: any) => {
-                return await txn.executeInline(testStatement);
+                return await txn.execute(testStatement);
             };
             const retryIndicator = () => {};
             const result: Result = await pooledQldbSession.executeLambda(query, retryIndicator);
@@ -109,7 +109,7 @@ describe("PooledQldbSession", () => {
             pooledQldbSession["_isClosed"] = true;
             const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
             const error = await chai.expect(pooledQldbSession.executeLambda(async (txn) => {
-                return await txn.executeInline(testStatement);
+                return await txn.execute(testStatement);
             })).to.be.rejected;
             chai.assert.equal(error.name, "SessionClosedError");
             sinon.assert.notCalled(executeSpy);
@@ -121,7 +121,7 @@ describe("PooledQldbSession", () => {
             };
             const executeSpy = sandbox.spy(mockQldbSession, "executeLambda");
             await chai.expect(pooledQldbSession.executeLambda(async (txn) => {
-                return await txn.executeInline(testStatement);
+                return await txn.execute(testStatement);
             })).to.be.rejected;
             sinon.assert.calledOnce(executeSpy);
         });

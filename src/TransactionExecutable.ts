@@ -26,7 +26,7 @@ export interface TransactionExecutable {
      *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a fully-buffered Result.
      */
-    executeInline(statement: string, ...parameters: any[]): Promise<Result>;
+    execute(statement: string, ...parameters: any[]): Promise<Result>;
 
     /**
      * Execute the specified statement in the current transaction.
@@ -35,5 +35,5 @@ export interface TransactionExecutable {
      *                   filling in parameters of the statement.
      * @returns Promise which fulfills with a Readable.
      */
-    executeStream(statement: string, ...parameters: any[]): Promise<Readable>;
+    executeAndStreamResults(statement: string, ...parameters: any[]): Promise<Readable>;
 }

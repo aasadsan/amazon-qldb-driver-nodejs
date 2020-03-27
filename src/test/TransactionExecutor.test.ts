@@ -64,72 +64,72 @@ describe("TransactionExecutor", () => {
         });
     });
 
-    describe("#executeInline()", () => {
+    describe("#execute()", () => {
         it("should return a Result object when provided with a statement", async () => {
-            mockTransaction.executeInline = async () => {
+            mockTransaction.execute = async () => {
                 return mockResult;
             };
-            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
-            const result = await transactionExecutor.executeInline(testStatement);
+            const transactionExecuteSpy = sandbox.spy(mockTransaction, "execute");
+            const result = await transactionExecutor.execute(testStatement);
             chai.assert.equal(mockResult, result);
             sinon.assert.calledOnce(transactionExecuteSpy);
             sinon.assert.calledWith(transactionExecuteSpy, testStatement);
         });
 
         it("should return a Result object when provided with a statement and parameters", async () => {
-            mockTransaction.executeInline = async () => {
+            mockTransaction.execute = async () => {
                 return mockResult;
             };
 
-            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
-            const result = await transactionExecutor.executeInline(testStatement, ["a"]);
+            const transactionExecuteSpy = sandbox.spy(mockTransaction, "execute");
+            const result = await transactionExecutor.execute(testStatement, ["a"]);
             chai.assert.equal(mockResult, result);
             sinon.assert.calledOnce(transactionExecuteSpy);
             sinon.assert.calledWith(transactionExecuteSpy, testStatement, ["a"]);
         });
 
         it("should return a rejected promise when error is thrown", async () => {
-            mockTransaction.executeInline = async () => {
+            mockTransaction.execute = async () => {
                 throw new Error(testMessage);
             };
-            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeInline");
-            const errorMessage = await chai.expect(transactionExecutor.executeInline(testStatement)).to.be.rejected;
+            const transactionExecuteSpy = sandbox.spy(mockTransaction, "execute");
+            const errorMessage = await chai.expect(transactionExecutor.execute(testStatement)).to.be.rejected;
             chai.assert.equal(errorMessage.name, "Error");
             sinon.assert.calledOnce(transactionExecuteSpy);
             sinon.assert.calledWith(transactionExecuteSpy, testStatement);
         });
     });
 
-    describe("#executeStream()", () => {
+    describe("#executeAndStreamResults()", () => {
         it("should return a Result object when provided with a statement", async () => {
-            mockTransaction.executeStream = async () => {
+            mockTransaction.executeAndStreamResults = async () => {
                 return mockResultStream;
             };
-            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
-            const resultStream = await transactionExecutor.executeStream(testStatement);
+            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeAndStreamResults");
+            const resultStream = await transactionExecutor.executeAndStreamResults(testStatement);
             chai.assert.equal(mockResultStream, resultStream);
             sinon.assert.calledOnce(transactionExecuteSpy);
             sinon.assert.calledWith(transactionExecuteSpy, testStatement);
         });
 
         it("should return a Result object when provided with a statement and parameters", async () => {
-            mockTransaction.executeStream = async () => {
+            mockTransaction.executeAndStreamResults = async () => {
                 return mockResultStream;
             };
 
-            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
-            const resultStream = await transactionExecutor.executeStream(testStatement, [5]);
+            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeAndStreamResults");
+            const resultStream = await transactionExecutor.executeAndStreamResults(testStatement, [5]);
             chai.assert.equal(mockResultStream, resultStream);
             sinon.assert.calledOnce(transactionExecuteSpy);
             sinon.assert.calledWith(transactionExecuteSpy, testStatement, [5]);
         });
 
         it("should return a rejected promise when error is thrown", async () => {
-            mockTransaction.executeStream = async () => {
+            mockTransaction.executeAndStreamResults = async () => {
                 throw new Error(testMessage);
             };
-            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeStream");
-            const errorMessage = await chai.expect(transactionExecutor.executeStream(testStatement)).to.be.rejected;
+            const transactionExecuteSpy = sandbox.spy(mockTransaction, "executeAndStreamResults");
+            const errorMessage = await chai.expect(transactionExecutor.executeAndStreamResults(testStatement)).to.be.rejected;
             chai.assert.equal(errorMessage.name, "Error");
             sinon.assert.calledOnce(transactionExecuteSpy);
             sinon.assert.calledWith(transactionExecuteSpy, testStatement);

@@ -133,50 +133,50 @@ describe("QldbSession", () => {
     });
 
     describe("#executeLambda()", () => {
-        it("should return a Result object when called with executeInline as the lambda", async () => {
+        it("should return a Result object when called with execute as the lambda", async () => {
             qldbSession.startTransaction = async () => {
                 return mockTransaction;
             };
-            mockTransaction.executeInline = async () => {
+            mockTransaction.execute = async () => {
                 return mockResult;
             };
             mockTransaction.commit = async () => {};
 
-            const executeInlineSpy = sandbox.spy(mockTransaction, "executeInline");
+            const executeSpy = sandbox.spy(mockTransaction, "execute");
             const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
             const commitSpy = sandbox.spy(mockTransaction, "commit");
 
             const result = await qldbSession.executeLambda(async (txn) => {
-                return await txn.executeInline(testStatement);
+                return await txn.execute(testStatement);
             });
-            sinon.assert.calledOnce(executeInlineSpy);
-            sinon.assert.calledWith(executeInlineSpy, testStatement);
+            sinon.assert.calledOnce(executeSpy);
+            sinon.assert.calledWith(executeSpy, testStatement);
             sinon.assert.calledOnce(startTransactionSpy);
             sinon.assert.calledOnce(commitSpy);
             chai.assert.equal(result, mockResult);
         });
 
-        it("should return a Result object when called with executeStream as the lambda", async () => {
+        it("should return a Result object when called with executeAndStreamResults as the lambda", async () => {
             const resultStub = sandbox.stub(Result, "bufferResultStream");
             resultStub.returns(Promise.resolve(mockResult));
 
             qldbSession.startTransaction = async () => {
                 return mockTransaction;
             };
-            mockTransaction.executeStream = async () => {
+            mockTransaction.executeAndStreamResults = async () => {
                 return resultStreamObject;
             };
             mockTransaction.commit = async () => {};
 
-            const executeStreamSpy = sandbox.spy(mockTransaction, "executeStream");
+            const executeAndStreamResultsSpy = sandbox.spy(mockTransaction, "executeAndStreamResults");
             const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
             const commitSpy = sandbox.spy(mockTransaction, "commit");
 
             const result = await qldbSession.executeLambda(async (txn) => {
-                return await txn.executeStream(testStatement);
+                return await txn.executeAndStreamResults(testStatement);
             });
-            sinon.assert.calledOnce(executeStreamSpy);
-            sinon.assert.calledWith(executeStreamSpy, testStatement);
+            sinon.assert.calledOnce(executeAndStreamResultsSpy);
+            sinon.assert.calledWith(executeAndStreamResultsSpy, testStatement);
             sinon.assert.calledOnce(startTransactionSpy);
             sinon.assert.calledOnce(resultStub);
             sinon.assert.calledOnce(commitSpy);
@@ -187,7 +187,7 @@ describe("QldbSession", () => {
             qldbSession["_isClosed"] = true;
 
             const error = await chai.expect(qldbSession.executeLambda(async (txn) => {
-                return await txn.executeInline(testStatement);
+                return await txn.execute(testStatement);
             })).to.be.rejected;
             chai.assert.equal(error.name, "SessionClosedError");
         });
@@ -202,7 +202,7 @@ describe("QldbSession", () => {
             const throwIfClosedSpy = sandbox.spy(qldbSession as any, "_throwIfClosed");
 
             await chai.expect(qldbSession.executeLambda(async (txn) => {
-                return await txn.executeInline(testStatement);
+                return await txn.execute(testStatement);
             })).to.be.rejected;
             sinon.assert.calledOnce(startTransactionSpy);
             sinon.assert.calledOnce(noThrowAbortSpy);

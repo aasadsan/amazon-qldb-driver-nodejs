@@ -41,27 +41,31 @@ export class TransactionExecutor implements TransactionExecutable {
     }
 
     /**
-     * Execute the specified statement in the current transaction.
+     * Execute the specified statement in the current transaction. This method returns a promise
+     * which eventually returns all the results loaded into memory.
+     *
      * @param statement The statement to execute.
-     * @param parameters Rest parameters of Ion values or JavaScript native types that are convertible to Ion for
-     *                   filling in parameters of the statement.
-     * @returns Promise which fulfills with a Result.
+     * @param parameters Variable number of arguments, where each argument corresponds to a
+     *                  placeholder (?) in the PartiQL query.
+     * @returns Promise which fulfills with all results loaded into memory
      * @throws {@linkcode TransactionClosedError} when the transaction is closed.
      */
-    async executeInline(statement: string, ...parameters: any[]): Promise<Result> {
-        return await this._transaction.executeInline(statement, ...parameters);
+    async execute(statement: string, ...parameters: any[]): Promise<Result> {
+        return await this._transaction.execute(statement, ...parameters);
     }
 
     /**
-     * Execute the specified statement in the current transaction.
+     * Execute the specified statement in the current transaction. This method returns a promise
+     * which fulfills with Readable interface, which allows you to stream one record at time
+     *
      * @param statement The statement to execute.
-     * @param parameters Rest parameters of Ion values or JavaScript native types that are convertible to Ion for
-     *                   filling in parameters of the statement.
-     * @returns Promise which fulfills with a ResultStream.
+     * @param parameters Variable number of arguments, where each argument corresponds to a
+     *                  placeholder (?) in the PartiQL query.
+     * @returns Promise which fulfills with a Readable Stream
      * @throws {@linkcode TransactionClosedError} when the transaction is closed.
      */
-    async executeStream(statement: string, ...parameters: any[]): Promise<Readable> {
-        return await this._transaction.executeStream(statement, ...parameters);
+    async executeAndStreamResults(statement: string, ...parameters: any[]): Promise<Readable> {
+        return await this._transaction.executeAndStreamResults(statement, ...parameters);
     }
 
     /**

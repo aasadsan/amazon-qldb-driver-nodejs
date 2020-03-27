@@ -114,26 +114,30 @@ export class Transaction implements TransactionExecutable {
     }
 
     /**
-     * Execute the specified statement in the current transaction.
+     * Execute the specified statement in the current transaction. This method returns a promise
+     * which eventually returns all the results loaded into memory.
+     *
      * @param statement A statement to execute against QLDB as a string.
-     * @param parameters Rest parameters of Ion values or JavaScript native types that are convertible to Ion for
-     *                   filling in parameters of the statement.
-     * @returns Promise which fulfills with a fully-buffered Result.
+     * @param parameters Variable number of arguments, where each argument corresponds to a
+     *                  placeholder (?) in the PartiQL query.
+     * @returns Promise which fulfills with all results loaded into memory
      */
-    async executeInline(statement: string, ...parameters: any[]): Promise<Result> {
+    async execute(statement: string, ...parameters: any[]): Promise<Result> {
         const result: ExecuteStatementResult = await this._sendExecute(statement, parameters);
         const inlineResult = Result.create(this._txnId, result.FirstPage, this._communicator);
         return inlineResult;
     }
 
     /**
-     * Execute the specified statement in the current transaction.
+     * Execute the specified statement in the current transaction. This method returns a promise
+     * which fulfills with Readable interface, which allows you to stream one record at time
+     *
      * @param statement A statement to execute against QLDB as a string.
-     * @param parameters Rest parameters of Ion values or JavaScript native types that are convertible to Ion for
-     *                   filling in parameters of the statement.
-     * @returns Promise which fulfills with a Readable.
+     * @param parameters Variable number of arguments, where each argument corresponds to a
+     *                  placeholder (?) in the PartiQL query.
+     * @returns Promise which fulfills with a Readable Stream
      */
-    async executeStream(statement: string, ...parameters: any[]): Promise<Readable> {
+    async executeAndStreamResults(statement: string, ...parameters: any[]): Promise<Readable> {
         const result: ExecuteStatementResult = await this._sendExecute(statement, parameters);
         return new ResultStream(this._txnId, result.FirstPage, this._communicator);
     }

@@ -161,7 +161,7 @@ export class QldbSessionImpl implements QldbSession {
     async getTableNames(): Promise<string[]> {
         const statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
         return await this.executeLambda(async (transactionExecutor) => {
-            const result: Readable = await transactionExecutor.executeStream(statement);
+            const result: Readable = await transactionExecutor.executeAndStreamResults(statement);
             return await this._tableNameHelper(result);
         });
     }
