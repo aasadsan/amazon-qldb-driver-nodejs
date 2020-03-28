@@ -47,8 +47,10 @@ export class TransactionExecutor implements TransactionExecutable {
      * @param statement The statement to execute.
      * @param parameters Variable number of arguments, where each argument corresponds to a
      *                  placeholder (?) in the PartiQL query.
+     *                  The argument could be any native JavaScript type or an Ion DOM type.
+     *                  [Details of Ion DOM type and JavaScript type](https://github.com/amzn/ion-js/blob/master/src/dom/README.md#iondom-data-types)
      * @returns Promise which fulfills with all results loaded into memory
-     * @throws {@linkcode TransactionClosedError} when the transaction is closed.
+     * @throws [Error](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) when the passed argument value cannot be converted into Ion
      */
     async execute(statement: string, ...parameters: any[]): Promise<Result> {
         return await this._transaction.execute(statement, ...parameters);
@@ -61,8 +63,11 @@ export class TransactionExecutor implements TransactionExecutable {
      * @param statement The statement to execute.
      * @param parameters Variable number of arguments, where each argument corresponds to a
      *                  placeholder (?) in the PartiQL query.
+     *                  The argument could be any native JavaScript type or an Ion DOM type.
+     *                  [Details of Ion DOM type and JavaScript type](https://github.com/amzn/ion-js/blob/master/src/dom/README.md#iondom-data-types)
      * @returns Promise which fulfills with a Readable Stream
      * @throws {@linkcode TransactionClosedError} when the transaction is closed.
+     * @throws [Error](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) when the passed argument value cannot be converted into Ion
      */
     async executeAndStreamResults(statement: string, ...parameters: any[]): Promise<Readable> {
         return await this._transaction.executeAndStreamResults(statement, ...parameters);

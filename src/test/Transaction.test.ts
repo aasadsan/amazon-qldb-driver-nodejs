@@ -36,6 +36,7 @@ import { QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
+import { expect } from "chai";
 
 chai.use(chaiAsPromised);
 const sandbox = sinon.createSandbox();
@@ -447,11 +448,8 @@ describe("Transaction", () => {
 
             let expectedValueHolders: ValueHolder[] = [];
             parameters.forEach((value: any) => {
-                let writer = ionJs.makeBinaryWriter();
-                ionJs.dom.Value.from(value).writeTo(writer);
-                writer.close();
                 const valueHolder: ValueHolder = {
-                    IonBinary: writer.getBytes()
+                    IonBinary:  ionJs.dumpBinary(value)
                 };
                 expectedValueHolders.push(valueHolder);
             });
@@ -463,6 +461,29 @@ describe("Transaction", () => {
                 sinon.match.array.deepEquals(expectedValueHolders)
             );
             chai.assert.equal(testExecuteStatementResult, result);
+        });
+
+        it("should throw Error when called with parameters which cannot be converted to Ion", async () => {
+            const validParameter1 = 5;
+            const invalidParameter =  Symbol('foo');
+            const validParameter2 = 3;
+
+
+            const toQldbHashSpy = sandbox.spy(QldbHash, "toQldbHash");
+            const executeStatementSpy = sandbox.spy(transaction["_communicator"], "executeStatement");
+            await expect(
+                transaction["_sendExecute"](testStatement, [validParameter1, invalidParameter, validParameter2])
+            ).to.be.rejected;
+
+            sinon.assert.notCalled(executeStatementSpy);
+
+            sinon.assert.calledTwice(toQldbHashSpy);
+            sinon.assert.calledWith(toQldbHashSpy, testStatement);
+            //Ensure that the first valid parameter was added to qldbHash
+            sinon.assert.calledWith(toQldbHashSpy, ionJs.dumpBinary(validParameter1));
+            //Ensure that the second valid parameter was not called as the invalid parameter throws an error before it
+            sinon.assert.neverCalledWith(toQldbHashSpy, ionJs.dumpBinary(validParameter2));
+
         });
     });
 });
