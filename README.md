@@ -1,6 +1,7 @@
 # Amazon QLDB Node.js Driver
 
-[![NPM Version](https://img.shields.io/badge/npm-v1.0.0--rc.1-green)](https://www.npmjs.com/package/amazon-qldb-driver-nodejs)[![Documentation](https://img.shields.io/badge/docs-api-green.svg)](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.nodejs.html)
+[![NPM Version](https://img.shields.io/badge/npm-v1.0.0--rc.1-green)](https://www.npmjs.com/package/amazon-qldb-driver-nodejs) 
+[![Documentation](https://img.shields.io/badge/docs-api-green.svg)](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.nodejs.html)
 
 This is the Node.js driver for Amazon Quantum Ledger Database (QLDB), which allows Node.js developers
 to write software that makes use of AmazonQLDB.
@@ -34,12 +35,14 @@ To use the driver, in your package that wishes to use the driver, run the follow
 
 ```npm install amazon-qldb-driver-nodejs```
 
-The driver also has aws-sdk and ion-js as peer dependencies. Thus, they must also be dependencies of the package that
+The driver also has aws-sdk, ion-js and jsbi as peer dependencies. Thus, they must also be dependencies of the package that
 will be using the driver as a dependency.
 
 ```npm install aws-sdk```
 
 ```npm install ion-js```
+
+```npm install jsbi```
 
 Then from within your package, you can now use the driver by importing it. This example shows usage in TypeScript 
 specifying the QLDB ledger name and a specific region:

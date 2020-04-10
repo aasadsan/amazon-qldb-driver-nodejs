@@ -148,7 +148,7 @@ describe("PooledQldbDriver", () => {
             chai.assert.equal(pooledQldbDriver["_isClosed"], true);
         });
     });
-    
+
     describe("#executeLambda()", () => {
         it("should start a session and return the delegated call to the session", async () => {
             const getSessionStub = sandbox.stub(pooledQldbDriver, "getSession");
@@ -176,7 +176,7 @@ describe("PooledQldbDriver", () => {
             const retryIndicator = (retry: number) => {
                 return;
             };
-            
+
             pooledQldbDriver["_isClosed"] = true;
             const error = await chai.expect(pooledQldbDriver.executeLambda(lambda, retryIndicator)).to.be.rejected;
             chai.assert.instanceOf(error, DriverClosedError);

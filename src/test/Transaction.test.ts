@@ -241,7 +241,7 @@ describe("Transaction", () => {
             const sendExecuteSpy = sandbox.spy(transaction as any, "_sendExecute");
             const param1: number = 5;
             const param2: string = "a";
-            
+
             const result: Result = await transaction.execute(testStatement, [param1, param2]);
             sinon.assert.calledOnce(sendExecuteSpy);
             sinon.assert.calledWith(sendExecuteSpy, testStatement, [[param1, param2]]);
