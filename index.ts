@@ -7,7 +7,6 @@ export {
 } from "./src/errors/Errors";
 export { Executable } from "./src/Executable";
 export { PooledQldbDriver } from "./src/PooledQldbDriver";
-export { QldbDriver } from "./src/QldbDriver";
 export { QldbSession } from "./src/QldbSession";
 export { createQldbWriter, QldbWriter } from "./src/QldbWriter";
 export { Result } from "./src/Result";

@@ -12,14 +12,16 @@
  */
 
 import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
+import { QLDBSession } from "aws-sdk";
 import { globalAgent } from "http";
 import Semaphore from "semaphore-async-await";
 
+import { version } from "../package.json";
+import { Communicator } from "./Communicator";
+import { DriverClosedError } from "./errors/Errors";
 import { SessionPoolEmptyError } from "./errors/Errors";
 import { Executable } from "./Executable";
-import { debug } from "./LogUtil";
 import { PooledQldbSession } from "./PooledQldbSession";
-import { QldbDriver } from "./QldbDriver";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
 import { TransactionExecutor } from "./TransactionExecutor";
@@ -41,12 +43,16 @@ import { TransactionExecutor } from "./TransactionExecutor";
  * amount of connections the session client allows. {@linkcode PooledQldbDriver.close} should be called when this
  * factory is no longer needed in order to clean up resources, ending all sessions in the pool.
  */
-export class PooledQldbDriver extends QldbDriver implements Executable {
+export class PooledQldbDriver implements Executable {
     private _poolLimit: number;
     private _timeoutMillis: number;
     private _availablePermits: number;
     private _sessionPool: QldbSessionImpl[];
     private _semaphore: Semaphore;
+    protected _qldbClient: QLDBSession;
+    protected _ledgerName: string;
+    protected _retryLimit: number;
+    protected _isClosed: boolean;
 
     /**
      * Creates a PooledQldbDriver.
@@ -66,7 +72,17 @@ export class PooledQldbDriver extends QldbDriver implements Executable {
         poolLimit: number = 0,
         timeoutMillis: number = 30000
     ) {
-        super(ledgerName, qldbClientOptions, retryLimit);
+        if (retryLimit < 0) {
+            throw new RangeError("Value for retryLimit cannot be negative.");
+        }
+        qldbClientOptions.customUserAgent = `QLDB Driver for Node.js v${version}`;
+        qldbClientOptions.maxRetries = 0;
+
+        this._qldbClient = new QLDBSession(qldbClientOptions);
+        this._ledgerName = ledgerName;
+        this._retryLimit = retryLimit;
+        this._isClosed = false;
+
         if (timeoutMillis < 0) {
             throw new RangeError("Value for timeout cannot be negative.");
         }
@@ -103,10 +119,10 @@ export class PooledQldbDriver extends QldbDriver implements Executable {
      * Close this driver and any sessions in the pool.
      */
     close(): void {
-        super.close();
         this._sessionPool.forEach(session => {
             session.close();
         });
+        this._isClosed = true;
     }
 
     /**
@@ -164,7 +180,7 @@ export class PooledQldbDriver extends QldbDriver implements Executable {
             }
             try {
                 debug("Creating new pooled session.");
-                const newSession: QldbSessionImpl = <QldbSessionImpl> (await super.getSession());
+                const newSession: QldbSessionImpl = <QldbSessionImpl> (await this._createSession());
                 return new PooledQldbSession(newSession, this._returnSessionToPool);
             } catch (e) {
                 this._semaphore.release();
@@ -184,4 +200,26 @@ export class PooledQldbDriver extends QldbDriver implements Executable {
         this._availablePermits++;
         debug(`Session returned to pool; size is now ${this._sessionPool.length}.`);
     };
+
+    /**
+     * Check and throw if this driver is closed.
+     * @throws {@linkcode DriverClosedError} when this driver is closed.
+     */
+    protected _throwIfClosed(): void {
+        if (this._isClosed) {
+            throw new DriverClosedError();
+        }
+    }
+
+    /**
+     * Create and return a newly instantiated QldbSession object. This will implicitly start a new session with QLDB.
+     * @returns Promise which fulfills with a QldbSession.
+     * @throws {@linkcode DriverClosedError} when this driver is closed.
+     */
+    async _createSession(): Promise<QldbSession> {
+        this._throwIfClosed();
+        debug("Creating a new session.");
+        const communicator: Communicator = await Communicator.create(this._qldbClient, this._ledgerName);
+        return new QldbSessionImpl(communicator, this._retryLimit);
+    }
 }
