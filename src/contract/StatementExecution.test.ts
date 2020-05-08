@@ -308,7 +308,7 @@ describe("StatementExecution", function() {
                 // Update document
                 await txn.execute(`UPDATE ${constants.TABLE_NAME} SET ${constants.COLUMN_NAME} = ?`, currentValue + 5);
             });
-        };
+        }
 
         let occFlag: boolean = false;
         try {   

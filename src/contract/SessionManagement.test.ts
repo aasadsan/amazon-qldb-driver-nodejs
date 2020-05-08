@@ -165,7 +165,7 @@ describe("SessionManagement", function() {
                 // Update document
                 await txn.execute(`UPDATE ${constants.TABLE_NAME} SET ${constants.COLUMN_NAME} = ?`, currentValue + 5);
             });
-        };
+        }
 
         // Execute the function thrice
         await Promise.all([updateField(driver), updateField(driver), updateField(driver)]);
