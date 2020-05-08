@@ -14,13 +14,12 @@
 import { QLDBSession } from "aws-sdk";
 import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 import { globalAgent } from "http";
+import { dom } from "ion-js";
 import Semaphore from "semaphore-async-await";
-import { dom, IonTypes, IonType } from "ion-js";
-import { Readable } from "stream";
 
 import { version } from "../package.json";
 import { Communicator } from "./Communicator";
-import { ClientException, DriverClosedError } from "./errors/Errors";
+import { DriverClosedError } from "./errors/Errors";
 import { SessionPoolEmptyError } from "./errors/Errors";
 import { Executable } from "./Executable";
 import { debug } from "./LogUtil";
