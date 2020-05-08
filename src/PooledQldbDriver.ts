@@ -11,8 +11,8 @@
  * and limitations under the License.
  */
 
-import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 import { QLDBSession } from "aws-sdk";
+import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 import { globalAgent } from "http";
 import Semaphore from "semaphore-async-await";
 
@@ -206,7 +206,7 @@ export class PooledQldbDriver implements Executable {
      * Check and throw if this driver is closed.
      * @throws {@linkcode DriverClosedError} when this driver is closed.
      */
-    protected _throwIfClosed(): void {
+    private _throwIfClosed(): void {
         if (this._isClosed) {
             throw new DriverClosedError();
         }
