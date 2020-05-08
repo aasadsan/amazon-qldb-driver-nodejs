@@ -26,16 +26,12 @@ import {
 } from "aws-sdk/clients/qldbsession";
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
-import { dom } from "ion-js";
 import * as sinon from "sinon";
-import { Readable } from "stream";
-import { format } from "util";
 
 import { Communicator } from "../Communicator";
 import * as Errors from "../errors/Errors";
 import * as LogUtil from "../LogUtil";
 import { QldbSessionImpl } from "../QldbSessionImpl";
-import { createQldbWriter, QldbWriter } from "../QldbWriter";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
@@ -51,7 +47,6 @@ const testStartTransactionResult: StartTransactionResult = {
     TransactionId: testTransactionId
 };
 const testMessage: string = "foo";
-const testTableNames: string[] = ["Vehicle", "Person"];
 const testStatement: string = "SELECT * FROM foo";
 const testAbortTransactionResult: AbortTransactionResult = {};
 
@@ -312,16 +307,6 @@ describe("QldbSession", () => {
         });
     });
 
-    describe("#getTableNames()", () => {
-        it("should return a list of table names when called", async () => {
-            const executeStub = sandbox.stub(qldbSession, "executeLambda");
-            executeStub.returns(Promise.resolve(testTableNames));
-            const listOfTableNames: string[] = await qldbSession.getTableNames();
-            chai.assert.equal(listOfTableNames.length, testTableNames.length);
-            chai.assert.equal(listOfTableNames, testTableNames);
-        });
-    });
-
     describe("#startTransaction()", () => {
         it("should return a Transaction object when called", async () => {
             const communicatorTransactionSpy = sandbox.spy(mockCommunicator, "startTransaction");
@@ -419,73 +404,6 @@ describe("QldbSession", () => {
             await qldbSession["_retrySleep"](attemptNumber);
             sinon.assert.calledOnce(timeoutSpy);
             sinon.assert.calledWith(timeoutSpy, sinon.match.any, sleepValue);
-        });
-    });
-
-    describe("#_tableNameHelper()", () => {
-        it("should return a list of table names when called with a Stream containing valid Ion values", async () => {
-            const value1: ValueHolder = {IonBinary: format("{ name:\"%s\" }", testTableNames[0])};
-            const value2: ValueHolder = {IonBinary: format("{ name:\"%s\" }", testTableNames[1])};
-            const values: dom.Value[] = [
-                dom.load(Result._handleBlob(value1.IonBinary)),
-                dom.load(Result._handleBlob(value2.IonBinary))
-            ];
-            let eventCount: number = 0;
-            const mockResultStream: Readable = new Readable({
-                objectMode: true,
-                read: function(size) {
-                    if (eventCount < values.length) {
-                        eventCount += 1;
-                        return this.push(values[eventCount-1]);
-                    } else {
-                        return this.push(null);
-                    }
-                }
-            });
-            const tableNames: string[] = await qldbSession["_tableNameHelper"](<ResultStream> mockResultStream);
-            tableNames.forEach((tableName, i) => {
-                chai.assert.equal(tableName, testTableNames[i]);
-            });
-        });
-
-        it("should return a rejected promise when called with a Stream containing values with no struct", async () => {
-            const value1: ValueHolder = {IonBinary: "notAStruct"};
-            const values: dom.Value[] = [dom.load(Result._handleBlob(value1.IonBinary))];
-            let eventCount: number = 0;
-            const mockResultStream: Readable = new Readable({
-                objectMode: true,
-                read: function(size) {
-                    if (eventCount < values.length) {
-                        eventCount += 1;
-                        return this.push(values[eventCount-1]);
-                    } else {
-                        return this.push(null);
-                    }
-                }
-            });
-            const error =
-                await chai.expect(qldbSession["_tableNameHelper"](<ResultStream> mockResultStream)).to.be.rejected;
-            chai.assert.equal(error.name, "ClientException");
-        });
-
-        it("should return a rejected promise when called with a Stream containing values with no string", async () => {
-            const value1: ValueHolder = {IonBinary: "{ name:1 }"};
-            const values: dom.Value[] = [dom.load(Result._handleBlob(value1.IonBinary))];
-            let eventCount: number = 0;
-            const mockResultStream: Readable = new Readable({
-                objectMode: true,
-                read: function(size) {
-                    if (eventCount < values.length) {
-                        eventCount += 1;
-                        return this.push(values[eventCount-1]);
-                    } else {
-                        return this.push(null);
-                    }
-                }
-            });
-            const error =
-                await chai.expect(qldbSession["_tableNameHelper"](<ResultStream> mockResultStream)).to.be.rejected;
-            chai.assert.equal(error.name, "ClientException");
         });
     });
 });

@@ -15,10 +15,12 @@ import { QLDBSession } from "aws-sdk";
 import { ClientConfiguration } from "aws-sdk/clients/qldbsession";
 import { globalAgent } from "http";
 import Semaphore from "semaphore-async-await";
+import { dom, IonTypes, IonType } from "ion-js";
+import { Readable } from "stream";
 
 import { version } from "../package.json";
 import { Communicator } from "./Communicator";
-import { DriverClosedError } from "./errors/Errors";
+import { ClientException, DriverClosedError } from "./errors/Errors";
 import { SessionPoolEmptyError } from "./errors/Errors";
 import { Executable } from "./Executable";
 import { debug } from "./LogUtil";
@@ -155,6 +157,18 @@ export class PooledQldbDriver implements Executable {
     }
 
     /**
+     * Lists all tables in the ledger.
+     * @returns Promise which fulfills with an array of table names.
+     */
+    async getTableNames(): Promise<string[]> {
+        const statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
+        return await this.executeLambda(async (transactionExecutor) => {
+            const result: Readable = await transactionExecutor.executeAndStreamResults(statement);
+            return await this._tableNameHelper(result);
+        });
+    }
+
+    /**
      * This method will attempt to retrieve an active, existing session, or it will start a new session with QLDB if
      * none are available and the session pool limit has not been reached. If the pool limit has been reached, it will
      * attempt to retrieve a session from the pool until the timeout is reached.
@@ -222,5 +236,39 @@ export class PooledQldbDriver implements Executable {
         debug("Creating a new session.");
         const communicator: Communicator = await Communicator.create(this._qldbClient, this._ledgerName);
         return new QldbSessionImpl(communicator, this._retryLimit);
+    }
+
+
+    /**
+     * Helper function for getTableNames.
+     * @param resultStream The result from QLDB containing the table names.
+     * @returns Promise which fulfills with an array of table names or rejects with a {@linkcode ClientException}
+     * when the Ion value does not contain a struct or if the value within the struct is not of type string.
+     */
+    private _tableNameHelper(resultStream: Readable): Promise<string[]> {
+        return new Promise((res, rej) => {
+            const listOfStrings: string[] = [];
+            resultStream.on("data", function(value: dom.Value) {
+                let type: IonType = value.getType();
+                if (type.binaryTypeId !== IonTypes.STRUCT.binaryTypeId) {
+                    return rej(new ClientException(
+                        `Unexpected format: expected struct, but got IonType with binary encoding: ` +
+                        `${type.binaryTypeId}`
+                    ));
+                }
+                value = value.get("name");
+                type = value.getType();
+                if (type.binaryTypeId === IonTypes.STRING.binaryTypeId) {
+                    listOfStrings.push(value.stringValue());
+                } else {
+                    return rej(new ClientException(
+                        `Unexpected format: expected string, but got IonType with binary encoding: ` +
+                        `${type.binaryTypeId}.`
+                    ));
+                }
+            }).on("end", function() {
+                res(listOfStrings);
+            });
+        });
     }
 }

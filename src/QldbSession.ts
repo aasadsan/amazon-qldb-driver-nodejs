@@ -58,12 +58,6 @@ export interface QldbSession extends Executable {
     getSessionToken: () => string;
 
     /**
-     * Lists all tables in the ledger.
-     * @returns Promise which fulfills with an array of table names.
-     */
-    getTableNames: () => Promise<string[]>;
-
-    /**
      * Start a transaction using an available database session.
      * @returns Promise which fulfills with a transaction object.
      * @throws {@linkcode SessionClosedError} when the session is closed.

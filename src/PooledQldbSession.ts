@@ -87,15 +87,6 @@ export class PooledQldbSession implements QldbSession {
     }
 
     /**
-     * Lists all tables in the ledger.
-     * @returns Promise which fulfills with an array of table names.
-     */
-    async getTableNames(): Promise<string[]> {
-        this._throwIfClosed();
-        return await this._session.getTableNames();
-    }
-
-    /**
      * Start a transaction using an available database session.
      * @returns Promise which fulfills with a Transaction object.
      * @throws {@linkcode SessionClosedError} when this session is closed.

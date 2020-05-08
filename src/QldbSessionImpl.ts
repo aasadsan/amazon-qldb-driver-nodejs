@@ -12,12 +12,9 @@
  */
 
 import { StartTransactionResult } from "aws-sdk/clients/qldbsession";
-import { dom, IonTypes, IonType } from "ion-js";
-import { Readable } from "stream";
 
 import { Communicator } from "./Communicator";
 import {
-    ClientException,
     isInvalidSessionException,
     isOccConflictException,
     isRetriableException,
@@ -154,17 +151,6 @@ export class QldbSessionImpl implements QldbSession {
         return this._communicator.getSessionToken();
     }
 
-    /**
-     * Lists all tables in the ledger.
-     * @returns Promise which fulfills with an array of table names.
-     */
-    async getTableNames(): Promise<string[]> {
-        const statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
-        return await this.executeLambda(async (transactionExecutor) => {
-            const result: Readable = await transactionExecutor.executeAndStreamResults(statement);
-            return await this._tableNameHelper(result);
-        });
-    }
 
     /**
      * Start a transaction using an available database session.
@@ -233,38 +219,6 @@ export class QldbSessionImpl implements QldbSession {
 
     }
 
-    /**
-     * Helper function for getTableNames.
-     * @param resultStream The result from QLDB containing the table names.
-     * @returns Promise which fulfills with an array of table names or rejects with a {@linkcode ClientException}
-     * when the Ion value does not contain a struct or if the value within the struct is not of type string.
-     */
-    private _tableNameHelper(resultStream: Readable): Promise<string[]> {
-        return new Promise((res, rej) => {
-            const listOfStrings: string[] = [];
-            resultStream.on("data", function(value: dom.Value) {
-                let type: IonType = value.getType();
-                if (type.binaryTypeId !== IonTypes.STRUCT.binaryTypeId) {
-                    return rej(new ClientException(
-                        `Unexpected format: expected struct, but got IonType with binary encoding: ` +
-                        `${type.binaryTypeId}`
-                    ));
-                }
-                value = value.get("name");
-                type = value.getType();
-                if (type.binaryTypeId === IonTypes.STRING.binaryTypeId) {
-                    listOfStrings.push(value.stringValue());
-                } else {
-                    return rej(new ClientException(
-                        `Unexpected format: expected string, but got IonType with binary encoding: ` +
-                        `${type.binaryTypeId}.`
-                    ));
-                }
-            }).on("end", function() {
-                res(listOfStrings);
-            });
-        });
-    }
 
     /**
      * Check and throw if this session is closed.

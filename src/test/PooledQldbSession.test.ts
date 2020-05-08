@@ -16,7 +16,6 @@ import "mocha";
 
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
-import { dom } from "ion-js";
 import * as sinon from "sinon";
 
 import * as LogUtil from "../LogUtil";
@@ -34,7 +33,6 @@ const testLedgerName: string = "fakeLedgerName";
 const testMessage: string = "foo";
 const testSessionToken: string = "sessionToken";
 const testStatement: string = "SELECT * FROM foo";
-const testTableNames: string[] = ["Vehicle", "Person"];
 
 const mockQldbSession: QldbSessionImpl = <QldbSessionImpl><any> sandbox.mock(QldbSessionImpl);
 const mockResult: Result = <Result><any> sandbox.mock(Result);
@@ -54,9 +52,6 @@ describe("PooledQldbSession", () => {
         };
         mockQldbSession.getSessionToken = () => {
             return testSessionToken;
-        };
-        mockQldbSession.getTableNames = async () => {
-            return testTableNames;
         };
         mockQldbSession.startTransaction = async () => {
             return mockTransaction;
@@ -160,23 +155,6 @@ describe("PooledQldbSession", () => {
                 pooledQldbSession.getSessionToken();
             }).to.throw(SessionClosedError);
             sinon.assert.notCalled(sessionTokenSpy);
-        });
-    });
-
-    describe("#getTableNames()", () => {
-        it("should return a list of table names when called", async () => {
-            const tableNamesSpy = sandbox.spy(mockQldbSession, "getTableNames");
-            const tableNames: string[] = await pooledQldbSession.getTableNames();
-            chai.assert.equal(tableNames, testTableNames);
-            sinon.assert.calledOnce(tableNamesSpy);
-        });
-
-        it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
-            pooledQldbSession["_isClosed"] = true;
-            const tableNamesSpy = sandbox.spy(mockQldbSession, "getTableNames");
-            const error = await chai.expect(pooledQldbSession.getTableNames()).to.be.rejected;
-            chai.assert.equal(error.name, "SessionClosedError");
-            sinon.assert.notCalled(tableNamesSpy);
         });
     });
 
