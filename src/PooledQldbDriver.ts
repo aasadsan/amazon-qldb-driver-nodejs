@@ -21,6 +21,7 @@ import { Communicator } from "./Communicator";
 import { DriverClosedError } from "./errors/Errors";
 import { SessionPoolEmptyError } from "./errors/Errors";
 import { Executable } from "./Executable";
+import { debug } from "./LogUtil";
 import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
