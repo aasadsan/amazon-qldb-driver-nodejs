@@ -28,6 +28,7 @@ import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
 import { TransactionExecutor } from "./TransactionExecutor";
+import { Result } from "./Result";
 
 /**
  * Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
@@ -163,8 +164,13 @@ export class PooledQldbDriver implements Executable {
     async getTableNames(): Promise<string[]> {
         const statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
         return await this.executeLambda(async (transactionExecutor) => {
-            const result: Readable = await transactionExecutor.executeAndStreamResults(statement);
-            return await this._tableNameHelper(result);
+            const result: Result = await transactionExecutor.execute(statement);
+            const resultStructs: dom.Value[] = result.getResultList();
+            const listOfTableNames: string[] = [];
+            resultStructs.forEach((tableNameStruct) => {
+                listOfTableNames.push(tableNameStruct.get("name").stringValue());
+            });
+            return listOfTableNames;
         });
     }
 
@@ -236,39 +242,5 @@ export class PooledQldbDriver implements Executable {
         debug("Creating a new session.");
         const communicator: Communicator = await Communicator.create(this._qldbClient, this._ledgerName);
         return new QldbSessionImpl(communicator, this._retryLimit);
-    }
-
-
-    /**
-     * Helper function for getTableNames.
-     * @param resultStream The result from QLDB containing the table names.
-     * @returns Promise which fulfills with an array of table names or rejects with a {@linkcode ClientException}
-     * when the Ion value does not contain a struct or if the value within the struct is not of type string.
-     */
-    private _tableNameHelper(resultStream: Readable): Promise<string[]> {
-        return new Promise((res, rej) => {
-            const listOfStrings: string[] = [];
-            resultStream.on("data", function(value: dom.Value) {
-                let type: IonType = value.getType();
-                if (type.binaryTypeId !== IonTypes.STRUCT.binaryTypeId) {
-                    return rej(new ClientException(
-                        `Unexpected format: expected struct, but got IonType with binary encoding: ` +
-                        `${type.binaryTypeId}`
-                    ));
-                }
-                value = value.get("name");
-                type = value.getType();
-                if (type.binaryTypeId === IonTypes.STRING.binaryTypeId) {
-                    listOfStrings.push(value.stringValue());
-                } else {
-                    return rej(new ClientException(
-                        `Unexpected format: expected string, but got IonType with binary encoding: ` +
-                        `${type.binaryTypeId}.`
-                    ));
-                }
-            }).on("end", function() {
-                res(listOfStrings);
-            });
-        });
     }
 }
