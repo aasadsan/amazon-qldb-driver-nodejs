@@ -31,7 +31,7 @@ import * as sinon from "sinon";
 import { Communicator } from "../Communicator";
 import * as Errors from "../errors/Errors";
 import * as LogUtil from "../LogUtil";
-import { QldbSessionImpl } from "../QldbSessionImpl";
+import { QldbSession } from "../QldbSession";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
@@ -72,12 +72,12 @@ const mockResult: Result = <Result><any> sandbox.mock(Result);
 const mockTransaction: Transaction = <Transaction><any> sandbox.mock(Transaction);
 
 const resultStreamObject: ResultStream = new ResultStream(testTransactionId, testPage, mockCommunicator);
-let qldbSession: QldbSessionImpl;
+let qldbSession: QldbSession;
 
 describe("QldbSession", () => {
 
     beforeEach(() => {
-        qldbSession = new QldbSessionImpl(mockCommunicator, testRetryLimit);
+        qldbSession = new QldbSession(mockCommunicator, testRetryLimit);
         mockCommunicator.endSession = async () => {};
         mockCommunicator.getLedgerName = () => {
             return testLedgerName;

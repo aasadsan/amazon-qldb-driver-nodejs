@@ -30,7 +30,7 @@ import { debug, warn } from "./LogUtil";
 
 /**
  * A class representing an independent session to a QLDB ledger that handles endpoint requests. This class is used in
- * {@linkcode QldbDriver} and {@linkcode QldbSessionImpl}. This class is not meant to be used directly by developers.
+ * {@linkcode QldbDriver} and {@linkcode QldbSession}. This class is not meant to be used directly by developers.
  */
 export class Communicator {
     private _qldbClient: QLDBSession;

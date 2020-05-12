@@ -19,19 +19,14 @@ import { ClientConfiguration, SendCommandResult, ValueHolder } from "aws-sdk/cli
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import { Agent } from "https";
-import { dom } from "ion-js";
 import Semaphore from "semaphore-async-await";
 import * as sinon from "sinon";
-import { Readable } from "stream";
-import { format } from "util";
 
 import { DriverClosedError, SessionPoolEmptyError } from "../errors/Errors";
 import * as LogUtil from "../LogUtil";
 import { PooledQldbDriver } from "../PooledQldbDriver";
 import { QldbSession } from "../QldbSession";
-import { QldbSessionImpl } from "../QldbSessionImpl";
 import { Result } from "../Result";
-import { ResultStream } from "../ResultStream";
 import { TransactionExecutor } from "../TransactionExecutor";
 
 chai.use(chaiAsPromised);
@@ -64,7 +59,7 @@ const testLowLevelClientOptions: ClientConfiguration = {
 };
 
 const mockResult: Result = <Result><any> sandbox.mock(Result);
-const mockQldbSession: QldbSession = <QldbSession><any> sandbox.mock(QLDBSession);
+const mockQldbSession: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
 mockQldbSession.executeLambda = async () => {
     return mockResult;
 }
@@ -136,8 +131,8 @@ describe("PooledQldbDriver", () => {
 
     describe("#close()", () => {
         it("should close pooledQldbDriver and any session present in the pool when called", () => {
-            const mockSession1: QldbSessionImpl = <QldbSessionImpl><any> sandbox.mock(QldbSessionImpl);
-            const mockSession2: QldbSessionImpl = <QldbSessionImpl><any> sandbox.mock(QldbSessionImpl);
+            const mockSession1: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
+            const mockSession2: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
             mockSession1.close = () => {};
             mockSession2.close = () => {};
 
@@ -170,7 +165,6 @@ describe("PooledQldbDriver", () => {
             chai.assert.equal(result, mockResult);
             sinon.assert.calledOnce(executeLambdaSpy);
             sinon.assert.calledWith(executeLambdaSpy, lambda, retryIndicator);
-            sinon.assert.calledOnce(closeSessionSpy);
         });
 
         it("should throw DriverClosedError wrapped in a rejected promise when closed", async () => {
@@ -202,19 +196,18 @@ describe("PooledQldbDriver", () => {
 
             const logDebugSpy = sandbox.spy(LogUtil, "debug");
 
-            const pooledQldbSession: QldbSession = await pooledQldbDriver.getSession();
+            const qldbSession: QldbSession = await pooledQldbDriver.getSession();
 
             sinon.assert.calledOnce(semaphoreStub);
             sinon.assert.calledThrice(logDebugSpy);
 
-            chai.assert.instanceOf(pooledQldbSession["_session"], QldbSessionImpl);
-            chai.assert.equal(pooledQldbSession["_returnSessionToPool"], pooledQldbDriver["_returnSessionToPool"]);
+            chai.assert.instanceOf(qldbSession, QldbSession);
             chai.assert.equal(pooledQldbDriver["_availablePermits"], testMaxSockets - 1);
 
         });
 
         it("should return the existing session already present in the session pool when called", async () => {
-            const mockSession: QldbSessionImpl = <QldbSessionImpl><any> sandbox.mock(QldbSessionImpl);
+            const mockSession: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
             mockSession["_abortOrClose"] = async () => {
                 return true;
             };
@@ -228,13 +221,11 @@ describe("PooledQldbDriver", () => {
             const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
             semaphoreStub.returns(Promise.resolve(true));
 
-            const pooledQldbSession: QldbSession = await pooledQldbDriver.getSession();
+            const qldbSession: QldbSession = await pooledQldbDriver.getSession();
 
-            sinon.assert.calledTwice(logDebugSpy);
+            sinon.assert.calledOnce(logDebugSpy);
             sinon.assert.calledOnce(abortOrCloseSpy);
 
-            chai.assert.equal(pooledQldbSession["_session"], mockSession);
-            chai.assert.equal(pooledQldbSession["_returnSessionToPool"], pooledQldbDriver["_returnSessionToPool"]);
             chai.assert.deepEqual(pooledQldbDriver["_sessionPool"], []);
             chai.assert.equal(pooledQldbDriver["_availablePermits"], testMaxSockets - 1);
         });
@@ -264,7 +255,7 @@ describe("PooledQldbDriver", () => {
         it("should return a session back to the session pool when called", () => {
             const logDebugSpy = sandbox.spy(LogUtil, "debug");
             const semaphoreReleaseSpy = sandbox.spy(pooledQldbDriver["_semaphore"], "release")
-            const mockSession: QldbSessionImpl = <QldbSessionImpl><any> sandbox.mock(QldbSessionImpl);
+            const mockSession: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
 
             pooledQldbDriver["_returnSessionToPool"](mockSession);
 

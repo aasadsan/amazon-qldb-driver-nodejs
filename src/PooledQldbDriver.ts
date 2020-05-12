@@ -21,11 +21,8 @@ import { version } from "../package.json";
 import { Communicator } from "./Communicator";
 import { DriverClosedError } from "./errors/Errors";
 import { SessionPoolEmptyError } from "./errors/Errors";
-import { Executable } from "./Executable";
 import { debug } from "./LogUtil";
-import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbSession } from "./QldbSession";
-import { QldbSessionImpl } from "./QldbSessionImpl";
 import { Result } from "./Result";
 import { TransactionExecutor } from "./TransactionExecutor";
 
@@ -46,11 +43,11 @@ import { TransactionExecutor } from "./TransactionExecutor";
  * amount of connections the session client allows. {@linkcode PooledQldbDriver.close} should be called when this
  * factory is no longer needed in order to clean up resources, ending all sessions in the pool.
  */
-export class PooledQldbDriver implements Executable {
+export class PooledQldbDriver {
     private _poolLimit: number;
     private _timeoutMillis: number;
     private _availablePermits: number;
-    private _sessionPool: QldbSessionImpl[];
+    private _sessionPool: QldbSession[];
     private _semaphore: Semaphore;
     protected _qldbClient: QLDBSession;
     protected _ledgerName: string;
@@ -151,7 +148,8 @@ export class PooledQldbDriver implements Executable {
             return await session.executeLambda(queryLambda, retryIndicator);
         } finally {
             if (session != null) {
-                session.close();
+                //CFR: In the follow-up CR when we change the pooleing
+                this._returnSessionToPool(session);
             }
         }
     }
@@ -189,17 +187,16 @@ export class PooledQldbDriver implements Executable {
         if (isPermitAcquired) {
             this._availablePermits--;
             while (this._sessionPool.length > 0) {
-                const session: QldbSessionImpl = this._sessionPool.pop();
+                const session: QldbSession = this._sessionPool.pop();
                 const isSessionAvailable: boolean = await session._abortOrClose();
                 if (isSessionAvailable) {
-                    debug("Reusing session from pool.")
-                    return new PooledQldbSession(session, this._returnSessionToPool);
+                    return session;
                 }
             }
             try {
                 debug("Creating new pooled session.");
-                const newSession: QldbSessionImpl = <QldbSessionImpl> (await this._createSession());
-                return new PooledQldbSession(newSession, this._returnSessionToPool);
+                const newSession: QldbSession = <QldbSession> (await this._createSession());
+                return newSession;
             } catch (e) {
                 this._semaphore.release();
                 this._availablePermits++;
@@ -212,7 +209,7 @@ export class PooledQldbDriver implements Executable {
     /**
      * Release a session back into the pool.
      */
-    private _returnSessionToPool = (session: QldbSessionImpl): void => {
+    private _returnSessionToPool = (session: QldbSession): void => {
         this._sessionPool.push(session);
         this._semaphore.release();
         this._availablePermits++;
@@ -238,6 +235,6 @@ export class PooledQldbDriver implements Executable {
         this._throwIfClosed();
         debug("Creating a new session.");
         const communicator: Communicator = await Communicator.create(this._qldbClient, this._ledgerName);
-        return new QldbSessionImpl(communicator, this._retryLimit);
+        return new QldbSession(communicator, this._retryLimit);
     }
 }
