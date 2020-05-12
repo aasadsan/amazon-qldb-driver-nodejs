@@ -26,8 +26,8 @@ import { debug } from "./LogUtil";
 import { PooledQldbSession } from "./PooledQldbSession";
 import { QldbSession } from "./QldbSession";
 import { QldbSessionImpl } from "./QldbSessionImpl";
-import { TransactionExecutor } from "./TransactionExecutor";
 import { Result } from "./Result";
+import { TransactionExecutor } from "./TransactionExecutor";
 
 /**
  * Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
@@ -162,13 +162,11 @@ export class PooledQldbDriver implements Executable {
      */
     async getTableNames(): Promise<string[]> {
         const statement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
-        return await this.executeLambda(async (transactionExecutor) => {
+        return await this.executeLambda(async (transactionExecutor: TransactionExecutor) : Promise<string[]> => {
             const result: Result = await transactionExecutor.execute(statement);
             const resultStructs: dom.Value[] = result.getResultList();
-            const listOfTableNames: string[] = [];
-            resultStructs.forEach((tableNameStruct) => {
-                listOfTableNames.push(tableNameStruct.get("name").stringValue());
-            });
+            const listOfTableNames: string[] = resultStructs.map(tableNameStruct =>
+                tableNameStruct.get("name").stringValue());
             return listOfTableNames;
         });
     }
