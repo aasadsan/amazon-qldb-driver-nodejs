@@ -35,6 +35,7 @@ import { QldbSession } from "../QldbSession";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
 import { Transaction } from "../Transaction";
+import { Session } from "inspector";
 
 chai.use(chaiAsPromised);
 const sandbox = sinon.createSandbox();
@@ -178,15 +179,6 @@ describe("QldbSession", () => {
             chai.assert.equal(result, mockResult);
         });
 
-        it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
-            qldbSession["_isClosed"] = true;
-
-            const error = await chai.expect(qldbSession.executeLambda(async (txn) => {
-                return await txn.execute(testStatement);
-            })).to.be.rejected;
-            chai.assert.equal(error.name, "SessionClosedError");
-        });
-
         it("should return a rejected promise when error is thrown", async () => {
             qldbSession.startTransaction = async () => {
                 throw new Error(testMessage);
@@ -194,14 +186,28 @@ describe("QldbSession", () => {
 
             const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
             const noThrowAbortSpy = sandbox.spy(qldbSession as any, "_noThrowAbort");
-            const throwIfClosedSpy = sandbox.spy(qldbSession as any, "_throwIfClosed");
 
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
             })).to.be.rejected;
             sinon.assert.calledOnce(startTransactionSpy);
             sinon.assert.calledOnce(noThrowAbortSpy);
-            sinon.assert.calledOnce(throwIfClosedSpy);
+        });
+
+        it("should throw StartTransactionError when startTrasaction fails", async () => {
+            let communicatorFailureError = new Error("This error should be translated to StartTransactionError");
+            let startTransactionError = new Errors.StartTransactionError(communicatorFailureError);
+            mockCommunicator.startTransaction = async () => {
+                throw communicatorFailureError;
+            };
+
+            const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
+            const noThrowAbortSpy = sandbox.spy(qldbSession as any, "_noThrowAbort");
+            chai.expect(qldbSession.executeLambda(async (txn) => {
+                return await txn.execute(testStatement);
+            })).to.be.rejectedWith(startTransactionError);
+            sinon.assert.calledOnce(startTransactionSpy);
+            sinon.assert.notCalled(noThrowAbortSpy);
         });
 
         it("should retry when OccConflictException occurs", async () => {
@@ -238,25 +244,15 @@ describe("QldbSession", () => {
             sinon.assert.callCount(logSpy, testRetryLimit);
         });
 
-        it("should create a new session and retry when InvalidSessionException occurs", async () => {
+        it("should return a rejected promise with the exception when InvalidSessionException occurs", async () => {
             const isInvalidSessionStub = sandbox.stub(Errors, "isInvalidSessionException");
             isInvalidSessionStub.returns(true);
 
-            const logWarnSpy = sandbox.spy(LogUtil, "warn");
-            const logInfoSpy = sandbox.spy(LogUtil, "info");
-
-            Communicator.create = async () => {
-                return mockCommunicator;
-            };
-            const communicatorSpy = sandbox.spy(Communicator, "create");
-
             await chai.expect(qldbSession.executeLambda(async (txn) => {
-                throw new Error(testMessage);
+                throw new Error("ISE");
             }, () => {})).to.be.rejected;
 
-            sinon.assert.callCount(logWarnSpy, testRetryLimit);
-            sinon.assert.callCount(logInfoSpy, testRetryLimit);
-            sinon.assert.callCount(communicatorSpy, testRetryLimit);
+           chai.assert.isTrue(qldbSession._isClosed);
         });
 
         it("should retry and execute provided retryIndicator lambda when retriable exception occurs", async () => {
@@ -316,36 +312,6 @@ describe("QldbSession", () => {
             sinon.assert.calledOnce(communicatorTransactionSpy);
         });
 
-        it("should return a SessionClosedError wrapped in a rejected promise when closed", async () => {
-            const communicatorTransactionSpy = sandbox.spy(mockCommunicator, "startTransaction");
-            qldbSession["_isClosed"] = true;
-            const error = await chai.expect(qldbSession.startTransaction()).to.be.rejected;
-            chai.assert.equal(error.name, "SessionClosedError");
-            sinon.assert.notCalled(communicatorTransactionSpy);
-        });
-    });
-
-    describe("#abortTransaction()", () => {
-        it("should call Communicator's abortTransaction() and return true when called", async () => {
-            const communicatorAbortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
-            chai.assert.equal(await qldbSession._abortOrClose(), true);
-            sinon.assert.calledOnce(communicatorAbortSpy);
-        });
-
-        it("should return false and close qldbSession when error is thrown", async () => {
-            mockCommunicator.abortTransaction = async () => {
-                throw new Error(testMessage);
-            };
-            chai.assert.equal(await qldbSession._abortOrClose(), false);
-            chai.assert.equal(await qldbSession["_isClosed"], true);
-        });
-
-        it("should return false when error is thrown", async () => {
-            const communicatorAbortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
-            qldbSession["_isClosed"] = true;
-            chai.assert.equal(await qldbSession._abortOrClose(), false);
-            sinon.assert.notCalled(communicatorAbortSpy);
-        });
     });
 
     describe("#_throwIfClosed()", () => {
@@ -362,12 +328,6 @@ describe("QldbSession", () => {
     });
 
     describe("#_noThrowAbort()", () => {
-        it("should call Communicator's abortTransaction() when Transaction is null", async () => {
-            const communicatorAbortSpy = sandbox.spy(mockCommunicator, "abortTransaction");
-            await qldbSession["_noThrowAbort"](null);
-            sinon.assert.calledOnce(communicatorAbortSpy);
-        });
-
         it("should call Transaction's abort() when Transaction is not null", async () => {
             mockTransaction.abort = async () => {};
             const communicatorAbortSpy = sandbox.spy(mockCommunicator, "abortTransaction");

@@ -83,6 +83,19 @@ export class TransactionClosedError extends Error {
     }
 }
 
+//CFR: This is exception should be used only by the driver to move to next session in pool 
+export class StartTransactionError extends Error {
+    constructor(e: Error) {
+        const message: string =
+            `Failed to start a transaction. Either another transaction is already open on this session or \
+            something else went wrong. Original Error Message: ${e.message}`;
+        super(message);
+        Object.setPrototypeOf(this, StartTransactionError.prototype)
+        this.message = message;
+        this.name = "StartTransactionError";
+        error(message);
+    }
+}
 /**
  * Is the exception an InvalidParameterException?
  * @param e The client error caught.

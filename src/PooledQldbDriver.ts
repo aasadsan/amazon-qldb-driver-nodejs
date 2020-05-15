@@ -19,7 +19,7 @@ import Semaphore from "semaphore-async-await";
 
 import { version } from "../package.json";
 import { Communicator } from "./Communicator";
-import { DriverClosedError } from "./errors/Errors";
+import { DriverClosedError, isInvalidSessionException, StartTransactionError } from "./errors/Errors";
 import { SessionPoolEmptyError } from "./errors/Errors";
 import { debug } from "./LogUtil";
 import { QldbSession } from "./QldbSession";
@@ -129,7 +129,7 @@ export class PooledQldbDriver {
      * Implicitly start a transaction within a new session, execute the lambda, commit the transaction, and close the
      * session, retrying up to the retry limit if an OCC conflict or retriable exception occurs.
      *
-     * @param queryLambda A lambda representing the block of code to be executed within the transaction. This cannot
+     * @param transactionLambda lambda representing the block of code to be executed within the transaction. This cannot
      *                    have any side effects as it may be invoked multiple times, and the result cannot be trusted
      *                    until the transaction is committed.
      * @param retryIndicator An optional lambda that is invoked when the `querylambda` is about to be retried due to an
@@ -139,17 +139,24 @@ export class PooledQldbDriver {
      * @throws {@linkcode DriverClosedError} when this driver is closed.
      */
     async executeLambda(
-        queryLambda: (transactionExecutor: TransactionExecutor) => any,
+        transactionLambda: (transactionExecutor: TransactionExecutor) => any,
         retryIndicator?: (retryAttempt: number) => void
     ): Promise<any> {
         let session: QldbSession = null;
-        try  {
-            session = await this.getSession();
-            return await session.executeLambda(queryLambda, retryIndicator);
-        } finally {
-            if (session != null) {
-                //CFR: In the follow-up CR when we change the pooleing
-                this._returnSessionToPool(session);
+        while(true) {
+            try  {
+                session = await this.getSession();
+                return await session.executeLambda(transactionLambda, retryIndicator);
+            } catch(e) {
+                if (e instanceof StartTransactionError || isInvalidSessionException(e)) {
+                    continue;
+                }
+                throw e;
+            } finally {
+                if (session != null) {
+                    //CFR: In the follow-up CR when we change the pooleing
+                    this._returnSessionToPool(session);
+                }
             }
         }
     }
@@ -186,17 +193,13 @@ export class PooledQldbDriver {
         const isPermitAcquired: boolean = await this._semaphore.waitFor(this._timeoutMillis);
         if (isPermitAcquired) {
             this._availablePermits--;
-            while (this._sessionPool.length > 0) {
-                const session: QldbSession = this._sessionPool.pop();
-                const isSessionAvailable: boolean = await session._abortOrClose();
-                if (isSessionAvailable) {
-                    return session;
-                }
-            }
             try {
-                debug("Creating new pooled session.");
-                const newSession: QldbSession = <QldbSession> (await this._createSession());
-                return newSession;
+                let session: QldbSession = this._sessionPool.pop();
+                if (session == undefined){
+                    debug("Creating new pooled session.");
+                    session = <QldbSession> (await this._createSession());
+                }
+                return session;
             } catch (e) {
                 this._semaphore.release();
                 this._availablePermits++;
@@ -210,7 +213,9 @@ export class PooledQldbDriver {
      * Release a session back into the pool.
      */
     private _returnSessionToPool = (session: QldbSession): void => {
-        this._sessionPool.push(session);
+        if (!session._isClosed) {
+            this._sessionPool.push(session);
+        }
         this._semaphore.release();
         this._availablePermits++;
         debug(`Session returned to pool; size is now ${this._sessionPool.length}.`);

@@ -19,6 +19,7 @@ import { ClientConfiguration, SendCommandResult, ValueHolder } from "aws-sdk/cli
 import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import { Agent } from "https";
+import * as Errors from "../errors/Errors";
 import Semaphore from "semaphore-async-await";
 import * as sinon from "sinon";
 
@@ -38,6 +39,7 @@ const testLedgerName: string = "LedgerName";
 const testMaxRetries: number = 0;
 const testMaxSockets: number = 10;
 const testMessage: string = "testMessage";
+const mockSessionToken: string = "sessionToken1";
 const testTableNames: string[] = ["Vehicle", "Person"];
 const testSendCommandResult: SendCommandResult = {
     StartSession: {
@@ -65,6 +67,9 @@ mockQldbSession.executeLambda = async () => {
 }
 mockQldbSession.close = () => {
     return;
+}
+mockQldbSession.getSessionToken = () => {
+    return mockSessionToken;
 }
 
 describe("PooledQldbDriver", () => {
@@ -167,6 +172,52 @@ describe("PooledQldbDriver", () => {
             sinon.assert.calledWith(executeLambdaSpy, lambda, retryIndicator);
         });
 
+        it("should pick next session from the pool when the current session throws InvalidSessionException", async() => {
+            const mockSession1: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
+            const mockSession2: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
+
+            const isInvalidSessionStub = sandbox.stub(Errors, "isInvalidSessionException");
+            isInvalidSessionStub.returns(true);
+
+            const lambda = (transactionExecutor: TransactionExecutor) => {
+                return true;
+            };
+
+            const retryIndicator = (retry: number) => {
+                return;
+            };
+
+            mockSession1.executeLambda = async () => {
+                mockSession1._isClosed = true;
+                throw new Error("InvalidSession");
+            };
+
+            mockSession1.getSessionToken = () => {
+                return "sessionToken1";
+            }
+
+            mockSession2.executeLambda = async () => {
+                return true;
+            };
+
+            mockSession2.getSessionToken = () => {
+                return "sessionToken2";
+            }
+
+            pooledQldbDriver["_sessionPool"] = [mockSession2, mockSession1];
+            const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
+            semaphoreStub.returns(Promise.resolve(true));
+
+            let initialPermits = pooledQldbDriver["_availablePermits"];
+            const result = await pooledQldbDriver.executeLambda(lambda, retryIndicator);
+
+
+            chai.assert.isTrue(result);
+            chai.assert.equal(pooledQldbDriver["_availablePermits"], initialPermits);
+            chai.assert.equal(pooledQldbDriver["_sessionPool"].length, 1);
+            chai.assert.equal(pooledQldbDriver["_sessionPool"][0].getSessionToken(), mockSession2.getSessionToken());
+        });
+
         it("should throw DriverClosedError wrapped in a rejected promise when closed", async () => {
             const lambda = (transactionExecutor: TransactionExecutor) => {
                 return true;
@@ -188,59 +239,40 @@ describe("PooledQldbDriver", () => {
             chai.assert.instanceOf(error, DriverClosedError);
         });
 
-        it("should return a new session when called", async () => {
+        it("should return a new session when no session exists in pool", async () => {
             pooledQldbDriver["_qldbClient"] = testQldbLowLevelClient;
 
             const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
             semaphoreStub.returns(Promise.resolve(true));
 
-            const logDebugSpy = sandbox.spy(LogUtil, "debug");
+            const createSessionStub = sandbox.stub(pooledQldbDriver, "_createSession");
+            createSessionStub.returns(Promise.resolve(mockQldbSession));
 
             const qldbSession: QldbSession = await pooledQldbDriver.getSession();
 
             sinon.assert.calledOnce(semaphoreStub);
-            sinon.assert.calledThrice(logDebugSpy);
+            sinon.assert.calledOnce(createSessionStub);
 
-            chai.assert.instanceOf(qldbSession, QldbSession);
+            chai.assert.equal(qldbSession, mockQldbSession);
             chai.assert.equal(pooledQldbDriver["_availablePermits"], testMaxSockets - 1);
-
         });
 
         it("should return the existing session already present in the session pool when called", async () => {
             const mockSession: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
-            mockSession["_abortOrClose"] = async () => {
-                return true;
-            };
 
             pooledQldbDriver["_sessionPool"] = [mockSession];
             pooledQldbDriver["_qldbClient"] = testQldbLowLevelClient;
-
-            const logDebugSpy = sandbox.spy(LogUtil, "debug");
-            const abortOrCloseSpy = sandbox.spy(mockSession as any, "_abortOrClose");
 
             const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
             semaphoreStub.returns(Promise.resolve(true));
 
             const qldbSession: QldbSession = await pooledQldbDriver.getSession();
 
-            sinon.assert.calledOnce(logDebugSpy);
-            sinon.assert.calledOnce(abortOrCloseSpy);
-
+            chai.assert.equal(qldbSession, mockSession);
             chai.assert.deepEqual(pooledQldbDriver["_sessionPool"], []);
             chai.assert.equal(pooledQldbDriver["_availablePermits"], testMaxSockets - 1);
+
         });
-
-        //TODO: Rework the test case after changing the  pooling logic. Remove reference to QldbDriver
-        //it("should return a rejected promise when error is thrown", async () => {
-        //    const qldbDriverGetSessionStub = sandbox.stub(QldbDriver.prototype, "getSession");
-        //    qldbDriverGetSessionStub.returns(Promise.reject(new Error(testMessage)));
-
-        //    const semaphoreReleaseSpy = sandbox.spy(pooledQldbDriver["_semaphore"], "release");
-
-        //    await chai.expect(pooledQldbDriver.getSession()).to.be.rejected;
-        //    chai.assert.equal(pooledQldbDriver["_availablePermits"], testMaxSockets);
-        //    sinon.assert.calledOnce(semaphoreReleaseSpy);
-        //});
 
         it("should return a SessionPoolEmptyError wrapped in a rejected promise when session pool empty", async () => {
             const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");

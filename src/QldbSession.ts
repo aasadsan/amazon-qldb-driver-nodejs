@@ -12,16 +12,16 @@
  */
 
 import { StartTransactionResult } from "aws-sdk/clients/qldbsession";
-
 import { Communicator } from "./Communicator";
 import {
     isInvalidSessionException,
     isOccConflictException,
     isRetriableException,
     LambdaAbortedError,
-    SessionClosedError
+    SessionClosedError,
+    StartTransactionError
 } from "./errors/Errors";
-import { info, warn } from "./LogUtil";
+import { warn } from "./LogUtil";
 import { Result } from "./Result";
 import { ResultStream } from "./ResultStream";
 import { Transaction } from "./Transaction";
@@ -52,7 +52,7 @@ const SLEEP_BASE_MS: number = 10;
 export class QldbSession {
     private _communicator: Communicator;
     private _retryLimit: number;
-    private _isClosed: boolean;
+    public _isClosed: boolean;
 
     /**
      * Creates a QldbSession.
@@ -80,7 +80,7 @@ export class QldbSession {
      * Implicitly start a transaction, execute the lambda, and commit the transaction, retrying up to the
      * retry limit if an OCC conflict or retriable exception occurs.
      *
-     * @param queryLambda A lambda representing the block of code to be executed within the transaction. This cannot
+     * @param transactionLambda lambda representing the block of code to be executed within the transaction. This cannot
      *                    have any side effects as it may be invoked multiple times, and the result cannot be trusted
      *                    until the transaction is committed.
      * @param retryIndicator An optional lambda that is invoked when the `querylambda` is about to be retried due to an
@@ -90,10 +90,9 @@ export class QldbSession {
      * @throws {@linkcode SessionClosedError} when this session is closed.
      */
     async executeLambda(
-        queryLambda: (transactionExecutor: TransactionExecutor) => any,
+        transactionLambda: (transactionExecutor: TransactionExecutor) => any,
         retryIndicator?: (retryAttempt: number) => void
     ): Promise<any> {
-        this._throwIfClosed();
         let transaction: Transaction;
         let retryAttempt: number = 0;
         while (true) {
@@ -101,27 +100,24 @@ export class QldbSession {
                 transaction = null;
                 transaction = await this.startTransaction();
                 const transactionExecutor = new TransactionExecutor(transaction);
-                let returnedValue: any = await queryLambda(transactionExecutor);
+                let returnedValue: any = await transactionLambda(transactionExecutor);
                 if (returnedValue instanceof ResultStream) {
                     returnedValue = await Result.bufferResultStream(returnedValue);
                 }
                 await transaction.commit();
                 return returnedValue;
             } catch (e) {
+                if (e instanceof StartTransactionError || isInvalidSessionException(e)) {
+                    this._isClosed = true;
+                    throw e;
+                }
+
                 await this._noThrowAbort(transaction);
                 if (retryAttempt >= this._retryLimit || e instanceof LambdaAbortedError) {
                     throw e;
                 }
-                if (isOccConflictException(e) || isRetriableException(e) || isInvalidSessionException(e)) {
+                if (isOccConflictException(e) || isRetriableException(e)) {
                     warn(`OCC conflict or retriable exception occurred: ${e}.`);
-                    if (isInvalidSessionException(e)) {
-                        info(`Creating a new session to QLDB; previous session is no longer valid: ${e}.`);
-                        this._communicator = await Communicator.create(
-                            this._communicator.getQldbClient(),
-                            this._communicator.getLedgerName()
-                        );
-                    }
-
                     retryAttempt++;
                     if (retryIndicator !== undefined) {
                         retryIndicator(retryAttempt);
@@ -157,30 +153,15 @@ export class QldbSession {
      * @throws {@linkcode SessionClosedError} when this session is closed.
      */
     async startTransaction(): Promise<Transaction> {
-        this._throwIfClosed();
-        const startTransactionResult: StartTransactionResult = await this._communicator.startTransaction();
-        const transaction: Transaction = new Transaction(
-            this._communicator,
-            startTransactionResult.TransactionId
-        );
-        return transaction;
-    }
-
-    /**
-     * Determine if the session is alive by sending an abort message. This should only be used when the session is
-     * known to not be in use, otherwise the state will be abandoned.
-     * @returns Promise which fulfills with true if the abort succeeded, otherwise false.
-     */
-    async _abortOrClose(): Promise<boolean> {
-        if (this._isClosed) {
-            return false;
-        }
         try {
-            await this._communicator.abortTransaction();
-            return true;
+            const startTransactionResult: StartTransactionResult = await this._communicator.startTransaction();
+            const transaction: Transaction = new Transaction(
+                this._communicator,
+                startTransactionResult.TransactionId
+            );
+            return transaction;
         } catch (e) {
-            this._isClosed = true;
-            return false;
+            throw new StartTransactionError(e);
         }
     }
 
@@ -191,9 +172,7 @@ export class QldbSession {
      */
     private async _noThrowAbort(transaction: Transaction): Promise<void> {
         try {
-            if (null == transaction) {
-                await this._communicator.abortTransaction()
-            } else {
+            if (transaction) {
                 await transaction.abort();
             }
         } catch (e) {
