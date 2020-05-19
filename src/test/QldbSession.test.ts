@@ -80,9 +80,6 @@ describe("QldbSession", () => {
     beforeEach(() => {
         qldbSession = new QldbSession(mockCommunicator, testRetryLimit);
         mockCommunicator.endSession = async () => {};
-        mockCommunicator.getLedgerName = () => {
-            return testLedgerName;
-        };
         mockCommunicator.getSessionToken = () => {
             return testSessionToken;
         };
@@ -282,15 +279,6 @@ describe("QldbSession", () => {
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 throw lambdaAbortedError;
             }, () => {})).to.be.rejected;
-        });
-    });
-
-    describe("#getLedgerName()", () => {
-        it("should return the ledger name when called", () => {
-            const communicatorLedgerSpy = sandbox.spy(mockCommunicator, "getLedgerName");
-            const ledgerName: string = qldbSession.getLedgerName();
-            chai.assert.equal(ledgerName, testLedgerName);
-            sinon.assert.calledOnce(communicatorLedgerSpy);
         });
     });
 

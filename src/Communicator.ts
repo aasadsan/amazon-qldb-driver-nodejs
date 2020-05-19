@@ -156,14 +156,6 @@ export class Communicator {
     }
 
     /**
-     * Get the QLDB ledger name.
-     * @returns The QLDB ledger name.
-     */
-    getLedgerName(): string {
-        return this._ledgerName;
-    }
-
-    /**
      * Get the low-level service client that communicates with QLDB.
      * @returns The low-level service client.
      */

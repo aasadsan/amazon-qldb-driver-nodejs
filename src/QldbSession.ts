@@ -138,13 +138,6 @@ export class QldbSession {
         }
     }
 
-    /**
-     * Return the name of the ledger for the session.
-     * @returns Returns the name of the ledger as a string.
-     */
-    getLedgerName(): string {
-        return this._communicator.getLedgerName();
-    }
 
     /**
      * Returns the token for this session.
