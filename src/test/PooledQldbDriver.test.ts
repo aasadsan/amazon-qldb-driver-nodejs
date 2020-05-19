@@ -65,11 +65,15 @@ const mockQldbSession: QldbSession = <QldbSession><any> sandbox.mock(QldbSession
 mockQldbSession.executeLambda = async () => {
     return mockResult;
 }
-mockQldbSession.close = () => {
+mockQldbSession.endSession = () => {
     return;
 }
 mockQldbSession.getSessionToken = () => {
     return mockSessionToken;
+}
+
+mockQldbSession.isSessionOpen = () => {
+    return true;
 }
 
 describe("PooledQldbDriver", () => {
@@ -138,11 +142,11 @@ describe("PooledQldbDriver", () => {
         it("should close pooledQldbDriver and any session present in the pool when called", () => {
             const mockSession1: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
             const mockSession2: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
-            mockSession1.close = () => {};
-            mockSession2.close = () => {};
+            mockSession1.endSession = () => {};
+            mockSession2.endSession = () => {};
 
-            const close1Spy = sandbox.spy(mockSession1, "close");
-            const close2Spy = sandbox.spy(mockSession2, "close");
+            const close1Spy = sandbox.spy(mockSession1, "endSession");
+            const close2Spy = sandbox.spy(mockSession2, "endSession");
 
             pooledQldbDriver["_sessionPool"] = [mockSession1, mockSession2];
             pooledQldbDriver.close();
@@ -155,13 +159,15 @@ describe("PooledQldbDriver", () => {
 
     describe("#executeLambda()", () => {
         it("should start a session and return the delegated call to the session", async () => {
-            const getSessionStub = sandbox.stub(pooledQldbDriver, "getSession");
-            getSessionStub.returns(Promise.resolve(mockQldbSession));
+            pooledQldbDriver["_sessionPool"] = [mockQldbSession];
+            const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
+            semaphoreStub.returns(Promise.resolve(true));
+
             const executeLambdaSpy = sandbox.spy(mockQldbSession, "executeLambda");
-            const closeSessionSpy = sandbox.spy(mockQldbSession, "close");
             const lambda = (transactionExecutor: TransactionExecutor) => {
                 return true;
             };
+
             const retryIndicator = (retry: number) => {
                 return;
             };
@@ -172,6 +178,13 @@ describe("PooledQldbDriver", () => {
             sinon.assert.calledWith(executeLambdaSpy, lambda, retryIndicator);
         });
 
+        /**
+         * This test covers the following rules:
+         *   1) If the permit is available, and there is/are session(s) in the pool, then return the last session from the pool
+         *   2) If the session throws InvalidSessionException, then do not return that session back to the pool. Also,
+         *   the driver will proceed with the next available session in the pool.
+         *   3) If the session is good, then return it to the pool.
+         */
         it("should pick next session from the pool when the current session throws InvalidSessionException", async() => {
             const mockSession1: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
             const mockSession2: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
@@ -188,12 +201,16 @@ describe("PooledQldbDriver", () => {
             };
 
             mockSession1.executeLambda = async () => {
-                mockSession1._isClosed = true;
+                mockSession1.closeSession();
                 throw new Error("InvalidSession");
             };
 
             mockSession1.getSessionToken = () => {
                 return "sessionToken1";
+            }
+
+            mockSession1.isSessionOpen = () => {
+                return false;
             }
 
             mockSession2.executeLambda = async () => {
@@ -204,6 +221,10 @@ describe("PooledQldbDriver", () => {
                 return "sessionToken2";
             }
 
+            mockSession2.isSessionOpen = () => {
+                return true;
+            }
+
             pooledQldbDriver["_sessionPool"] = [mockSession2, mockSession1];
             const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
             semaphoreStub.returns(Promise.resolve(true));
@@ -211,11 +232,14 @@ describe("PooledQldbDriver", () => {
             let initialPermits = pooledQldbDriver["_availablePermits"];
             const result = await pooledQldbDriver.executeLambda(lambda, retryIndicator);
 
-
+            //Ensure that the transaction was eventually completed
             chai.assert.isTrue(result);
-            chai.assert.equal(pooledQldbDriver["_availablePermits"], initialPermits);
+            //Ensure that the mockSession1 is not returned back to the pool since it threw ISE. Only mockSession2 should be present
             chai.assert.equal(pooledQldbDriver["_sessionPool"].length, 1);
             chai.assert.equal(pooledQldbDriver["_sessionPool"][0].getSessionToken(), mockSession2.getSessionToken());
+            // Ensure that although mockSession1 is not returned to the pool the total number of permits are same before beginning
+            // the transaction
+            chai.assert.equal(pooledQldbDriver["_availablePermits"], initialPermits);
         });
 
         it("should throw DriverClosedError wrapped in a rejected promise when closed", async () => {
@@ -230,71 +254,48 @@ describe("PooledQldbDriver", () => {
             const error = await chai.expect(pooledQldbDriver.executeLambda(lambda, retryIndicator)).to.be.rejected;
             chai.assert.instanceOf(error, DriverClosedError);
         });
-    });
-
-    describe("#getSession()", () => {
-        it("should return a DriverClosedError wrapped in a rejected promise when closed", async () => {
-            pooledQldbDriver["_isClosed"] = true;
-            const error = await chai.expect(pooledQldbDriver.getSession()).to.be.rejected;
-            chai.assert.instanceOf(error, DriverClosedError);
-        });
-
-        it("should return a new session when no session exists in pool", async () => {
-            pooledQldbDriver["_qldbClient"] = testQldbLowLevelClient;
-
-            const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
-            semaphoreStub.returns(Promise.resolve(true));
-
-            const createSessionStub = sandbox.stub(pooledQldbDriver, "_createSession");
-            createSessionStub.returns(Promise.resolve(mockQldbSession));
-
-            const qldbSession: QldbSession = await pooledQldbDriver.getSession();
-
-            sinon.assert.calledOnce(semaphoreStub);
-            sinon.assert.calledOnce(createSessionStub);
-
-            chai.assert.equal(qldbSession, mockQldbSession);
-            chai.assert.equal(pooledQldbDriver["_availablePermits"], testMaxSockets - 1);
-        });
-
-        it("should return the existing session already present in the session pool when called", async () => {
-            const mockSession: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
-
-            pooledQldbDriver["_sessionPool"] = [mockSession];
-            pooledQldbDriver["_qldbClient"] = testQldbLowLevelClient;
-
-            const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
-            semaphoreStub.returns(Promise.resolve(true));
-
-            const qldbSession: QldbSession = await pooledQldbDriver.getSession();
-
-            chai.assert.equal(qldbSession, mockSession);
-            chai.assert.deepEqual(pooledQldbDriver["_sessionPool"], []);
-            chai.assert.equal(pooledQldbDriver["_availablePermits"], testMaxSockets - 1);
-
-        });
 
         it("should return a SessionPoolEmptyError wrapped in a rejected promise when session pool empty", async () => {
             const semaphoreStub = sandbox.stub(pooledQldbDriver["_semaphore"], "waitFor");
             semaphoreStub.returns(Promise.resolve(false));
 
-            const error = await chai.expect(pooledQldbDriver.getSession()).to.be.rejected;
+            const lambda = (transactionExecutor: TransactionExecutor) => {
+                return true;
+            };
+
+            const error = await chai.expect(pooledQldbDriver.executeLambda(lambda)).to.be.rejected;
             chai.assert.instanceOf(error, SessionPoolEmptyError);
         });
+
     });
+
 
     describe("#releaseSession()", () => {
         it("should return a session back to the session pool when called", () => {
             const logDebugSpy = sandbox.spy(LogUtil, "debug");
             const semaphoreReleaseSpy = sandbox.spy(pooledQldbDriver["_semaphore"], "release")
-            const mockSession: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
+            pooledQldbDriver["_returnSessionToPool"](mockQldbSession);
 
-            pooledQldbDriver["_returnSessionToPool"](mockSession);
-
-            chai.assert.deepEqual(pooledQldbDriver["_sessionPool"], [mockSession])
+            chai.assert.deepEqual(pooledQldbDriver["_sessionPool"], [mockQldbSession])
             chai.assert.deepEqual(pooledQldbDriver["_availablePermits"], testMaxSockets + 1)
 
             sinon.assert.calledOnce(logDebugSpy);
+            sinon.assert.calledOnce(semaphoreReleaseSpy);
+        });
+
+        it("should NOT return a closed session back to the pool but should release the permit", () => {
+            const semaphoreReleaseSpy = sandbox.spy(pooledQldbDriver["_semaphore"], "release");
+            let initalPermits = pooledQldbDriver["_availablePermits"];
+
+            mockQldbSession.isSessionOpen = () => {
+                return false;
+            };
+
+            pooledQldbDriver["_returnSessionToPool"](mockQldbSession);
+            //Since the session was not open, it won't be returneed to the pool
+            chai.assert.deepEqual(pooledQldbDriver["_sessionPool"], []);
+            //The permit is released even if session is not returned to the pool
+            chai.assert.deepEqual(pooledQldbDriver["_availablePermits"], initalPermits + 1);
             sinon.assert.calledOnce(semaphoreReleaseSpy);
         });
     });

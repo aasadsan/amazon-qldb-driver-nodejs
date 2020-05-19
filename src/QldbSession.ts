@@ -52,7 +52,7 @@ const SLEEP_BASE_MS: number = 10;
 export class QldbSession {
     private _communicator: Communicator;
     private _retryLimit: number;
-    public _isClosed: boolean;
+    private _isClosed: boolean;
 
     /**
      * Creates a QldbSession.
@@ -66,14 +66,18 @@ export class QldbSession {
     }
 
     /**
-     * Close this session. No-op if already closed.
+     * End this session. No-op if already closed.
      */
-    close(): void {
+    endSession(): void {
         if (this._isClosed) {
             return;
         }
         this._isClosed = true;
         this._communicator.endSession();
+    }
+
+    closeSession(): void {
+        this._isClosed = true;
     }
 
     /**
@@ -107,8 +111,12 @@ export class QldbSession {
                 await transaction.commit();
                 return returnedValue;
             } catch (e) {
-                if (e instanceof StartTransactionError || isInvalidSessionException(e)) {
-                    this._isClosed = true;
+                if (e instanceof StartTransactionError) {
+                    throw e;
+                }
+
+                if (isInvalidSessionException(e)) {
+                    this.closeSession();
                     throw e;
                 }
 
@@ -144,6 +152,10 @@ export class QldbSession {
      */
     getSessionToken(): string {
         return this._communicator.getSessionToken();
+    }
+
+    isSessionOpen(): Boolean {
+        return !this._isClosed;
     }
 
 

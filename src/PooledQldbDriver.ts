@@ -120,7 +120,7 @@ export class PooledQldbDriver {
      */
     close(): void {
         this._sessionPool.forEach(session => {
-            session.close();
+            session.endSession();
         });
         this._isClosed = true;
     }
@@ -184,7 +184,7 @@ export class PooledQldbDriver {
      * @throws {@linkcode DriverClosedError} when this driver is closed.
      * @throws {@linkcode SessionPoolEmptyError} if the timeout is reached while attempting to retrieve a session.
      */
-    async getSession(): Promise<QldbSession> {
+    private async getSession(): Promise<QldbSession> {
         this._throwIfClosed();
         debug(
             `Getting session. Current free session count: ${this._sessionPool.length}. ` +
@@ -213,7 +213,7 @@ export class PooledQldbDriver {
      * Release a session back into the pool.
      */
     private _returnSessionToPool = (session: QldbSession): void => {
-        if (!session._isClosed) {
+        if (session.isSessionOpen()) {
             this._sessionPool.push(session);
         }
         this._semaphore.release();
@@ -236,7 +236,7 @@ export class PooledQldbDriver {
      * @returns Promise which fulfills with a QldbSession.
      * @throws {@linkcode DriverClosedError} when this driver is closed.
      */
-    async _createSession(): Promise<QldbSession> {
+    private async _createSession(): Promise<QldbSession> {
         this._throwIfClosed();
         debug("Creating a new session.");
         const communicator: Communicator = await Communicator.create(this._qldbClient, this._ledgerName);

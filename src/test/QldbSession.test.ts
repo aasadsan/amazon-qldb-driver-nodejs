@@ -112,10 +112,10 @@ describe("QldbSession", () => {
         });
     });
 
-    describe("#close()", () => {
-        it("should close qldbSession when called", async () => {
+    describe("#endSession()", () => {
+        it("should end qldbSession when called", async () => {
             const communicatorEndSpy = sandbox.spy(mockCommunicator, "endSession");
-            await qldbSession.close();
+            await qldbSession.endSession();
             chai.assert.equal(qldbSession["_isClosed"], true);
             sinon.assert.calledOnce(communicatorEndSpy);
         });
@@ -123,7 +123,7 @@ describe("QldbSession", () => {
         it("should be a no-op when already closed", async () => {
             const communicatorEndSpy = sandbox.spy(mockCommunicator, "endSession");
             qldbSession["_isClosed"] = true;
-            await qldbSession.close();
+            await qldbSession.endSession();
             sinon.assert.notCalled(communicatorEndSpy);
         });
     });
@@ -194,18 +194,18 @@ describe("QldbSession", () => {
             sinon.assert.calledOnce(noThrowAbortSpy);
         });
 
-        it("should throw StartTransactionError when startTrasaction fails", async () => {
+        it("should throw StartTransactionError when startTransaction fails", async () => {
             let communicatorFailureError = new Error("This error should be translated to StartTransactionError");
-            let startTransactionError = new Errors.StartTransactionError(communicatorFailureError);
             mockCommunicator.startTransaction = async () => {
                 throw communicatorFailureError;
             };
 
             const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
             const noThrowAbortSpy = sandbox.spy(qldbSession as any, "_noThrowAbort");
-            chai.expect(qldbSession.executeLambda(async (txn) => {
+            const error = await chai.expect(qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
-            })).to.be.rejectedWith(startTransactionError);
+            })).to.be.rejected;
+            chai.assert.instanceOf(error, Errors.StartTransactionError);
             sinon.assert.calledOnce(startTransactionSpy);
             sinon.assert.notCalled(noThrowAbortSpy);
         });
@@ -252,7 +252,7 @@ describe("QldbSession", () => {
                 throw new Error("ISE");
             }, () => {})).to.be.rejected;
 
-           chai.assert.isTrue(qldbSession._isClosed);
+           chai.assert.isFalse(qldbSession.isSessionOpen());
         });
 
         it("should retry and execute provided retryIndicator lambda when retriable exception occurs", async () => {
