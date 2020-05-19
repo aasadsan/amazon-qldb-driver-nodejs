@@ -87,8 +87,7 @@ export class TransactionClosedError extends Error {
 export class StartTransactionError extends Error {
     constructor(e: Error) {
         const message: string =
-            `Failed to start a transaction. Either another transaction is already open on this session or \
-            something else went wrong. Original Error Message: ${e.message}`;
+            `Failed to start a transaction. Either another transaction is already open on this session or something else went wrong. Please retry the transaction. Original Error Message: ${e.message}`;
         super(message);
         Object.setPrototypeOf(this, StartTransactionError.prototype)
         this.message = message;

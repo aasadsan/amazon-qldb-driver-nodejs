@@ -129,7 +129,7 @@ export class PooledQldbDriver {
      * Implicitly start a transaction within a new session, execute the lambda, commit the transaction, and close the
      * session, retrying up to the retry limit if an OCC conflict or retriable exception occurs.
      *
-     * @param transactionLambda lambda representing the block of code to be executed within the transaction. This cannot
+     * @param transactionLambda A lambda representing the block of code to be executed within the transaction. This cannot
      *                    have any side effects as it may be invoked multiple times, and the result cannot be trusted
      *                    until the transaction is committed.
      * @param retryIndicator An optional lambda that is invoked when the `querylambda` is about to be retried due to an
@@ -195,7 +195,7 @@ export class PooledQldbDriver {
             this._availablePermits--;
             try {
                 let session: QldbSession = this._sessionPool.pop();
-                if (session == undefined){
+                if (session == undefined) {
                     debug("Creating new pooled session.");
                     session = <QldbSession> (await this._createSession());
                 }
