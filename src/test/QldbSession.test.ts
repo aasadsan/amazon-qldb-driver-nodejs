@@ -199,10 +199,9 @@ describe("QldbSession", () => {
 
             const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
             const noThrowAbortSpy = sandbox.spy(qldbSession as any, "_noThrowAbort");
-            const error = await chai.expect(qldbSession.executeLambda(async (txn) => {
+            await chai.expect(qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
-            })).to.be.rejected;
-            chai.assert.instanceOf(error, Errors.StartTransactionError);
+            })).to.be.rejectedWith(Errors.StartTransactionError);
             sinon.assert.calledOnce(startTransactionSpy);
             sinon.assert.notCalled(noThrowAbortSpy);
         });
@@ -339,19 +338,35 @@ describe("QldbSession", () => {
         });
     });
 
-    describe("#_retrySleep()", () => {
-        it("should sleep when called", async () => {
+    describe("#_calculateDelayTime()", () => {
+        it("should increase delay exponentially when called", async () => {
             const mathRandStub = sandbox.stub(Math, "random");
             mathRandStub.returns(1);
-            const attemptNumber: number = 1;
-            const exponentialBackoff: number = Math.min(TEST_SLEEP_CAP_MS, Math.pow(TEST_SLEEP_BASE_MS, attemptNumber));
-            const sleepValue: number = 1 * (exponentialBackoff + 1);
-
-            const clock = sinon.useFakeTimers();
-            const timeoutSpy = sandbox.spy(clock, "setTimeout");
-            await qldbSession["_retrySleep"](attemptNumber);
-            sinon.assert.calledOnce(timeoutSpy);
-            sinon.assert.calledWith(timeoutSpy, sinon.match.any, sleepValue);
+            const delayTime1: number = qldbSession["_calculateDelayTime"](1);
+            const delayTime2: number = qldbSession["_calculateDelayTime"](2);
+            const delayTime3: number = qldbSession["_calculateDelayTime"](3);
+            chai.expect(delayTime2 - 1).to.equal((delayTime1 - 1) * 2);
+            chai.expect(delayTime3 - 1).to.equal((delayTime1 - 1) * 4);
+            chai.expect(delayTime3 - 1).to.equal((delayTime2 - 1) * 2);
         });
+    });
+
+    describe("#_retrySleep()", () => {
+        it("should sleep for exponentially increasing time when called", async () => {
+            const sleepSpy = sandbox.stub(qldbSession as any ,"_sleep");
+
+            const mathRandStub = sandbox.stub(Math, "random");
+            mathRandStub.returns(1);
+            const delayTime1: number = qldbSession["_calculateDelayTime"](1);
+            const delayTime2: number = qldbSession["_calculateDelayTime"](2);
+            qldbSession["_retrySleep"](1);
+            qldbSession["_retrySleep"](2);
+            sleepSpy.firstCall.calledWith(delayTime1);
+            sleepSpy.secondCall.calledWith(delayTime2);
+            chai.expect(delayTime2 - 1).to.equal((delayTime1 - 1) * 2);
+
+
+        });
+
     });
 });

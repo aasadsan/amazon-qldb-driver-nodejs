@@ -83,11 +83,12 @@ export class TransactionClosedError extends Error {
     }
 }
 
+
 //CFR: This is exception should be used only by the driver to move to next session in pool 
 export class StartTransactionError extends Error {
-    constructor(e: Error) {
+    constructor() {
         const message: string =
-            `Failed to start a transaction. Either another transaction is already open on this session or something else went wrong. Please retry the transaction. Original Error Message: ${e.message}`;
+            "Failed to start a transaction. Either another transaction is already open on this session or something else went wrong. Please retry the transaction.";
         super(message);
         Object.setPrototypeOf(this, StartTransactionError.prototype)
         this.message = message;

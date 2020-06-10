@@ -5,7 +5,7 @@ export {
     isResourceNotFoundException,
     isResourcePreconditionNotMetException
 } from "./src/errors/Errors";
-export { PooledQldbDriver } from "./src/PooledQldbDriver";
+export { QldbDriver } from "./src/QldbDriver";
 export { Result } from "./src/Result";
 export { Transaction } from "./src/Transaction";
 export { TransactionExecutor } from "./src/TransactionExecutor";

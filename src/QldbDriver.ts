@@ -19,31 +19,35 @@ import Semaphore from "semaphore-async-await";
 
 import { version } from "../package.json";
 import { Communicator } from "./Communicator";
-import { DriverClosedError, isInvalidSessionException, StartTransactionError } from "./errors/Errors";
-import { SessionPoolEmptyError } from "./errors/Errors";
+import { 
+    DriverClosedError, 
+    isInvalidSessionException,
+    SessionPoolEmptyError,
+    StartTransactionError
+ } from "./errors/Errors";
 import { debug } from "./LogUtil";
 import { QldbSession } from "./QldbSession";
 import { Result } from "./Result";
 import { TransactionExecutor } from "./TransactionExecutor";
 
 /**
- * Represents a factory for accessing pooled sessions to a specific ledger within QLDB. This class or
- * {@linkcode QldbDriver} should be the main entry points to any interaction with QLDB.
- * {@linkcode PooledQldbDriver.getSession} will create a {@linkcode PooledQldbSession} to the specified ledger within
- * QLDB as a communication channel. Any acquired sessions must be cleaned up with {@linkcode PooledQldbSession.close}
- * when they are no longer needed in order to return the session to the pool. If this is not done, this driver may
- * become unusable if the pool limit is exceeded.
- *
- * This factory pools sessions and attempts to return unused but available sessions when getting new sessions. The
- * advantage to using this over the non-pooling driver is that the underlying connection that sessions use to
- * communicate with QLDB can be recycled, minimizing resource usage by preventing unnecessary connections and reducing
- * latency by not making unnecessary requests to start new connections and end reusable, existing, ones.
- *
- * The pool does not remove stale sessions until a new session is retrieved. The default pool size is the maximum
- * amount of connections the session client allows. {@linkcode PooledQldbDriver.close} should be called when this
- * factory is no longer needed in order to clean up resources, ending all sessions in the pool.
+  * This is the entry point for all interactions with Amazon QLDB.
+  *
+  * In order to start using the driver, you need to instantiate it with a ledger name:
+  *
+  * ```
+  * let qldbDriver: QldbDriver = new QldbDriver(your-ledger-name);
+  * ```
+  * You can pass more parameters to the constructor of the driver which allow you to control certain limits
+  * to improve the performance. Check the {@link QldbDriver.constructor} to see all the available parameters.
+  *
+  * A single instance of the QldbDriver is attached to only one ledger. All transactions will be executed against
+  * the ledger specified.
+  *
+  * The driver exposes {@link QldbDriver.executeLambda}  method which should be used to execute the transactions.
+  * Check the {@link QldbDriver.executeLambda} method for more details on how to execute the Transaction.
  */
-export class PooledQldbDriver {
+export class QldbDriver {
     private _poolLimit: number;
     private _timeoutMillis: number;
     private _availablePermits: number;
@@ -55,15 +59,20 @@ export class PooledQldbDriver {
     protected _isClosed: boolean;
 
     /**
-     * Creates a PooledQldbDriver.
+     * Creates a QldbDriver instance that can be used to execute transactions against Amazon QLDB. A single instance of the QldbDriver
+     * is always attached to one ledger, as specified in the ledgerName parameter.
+     *
+     * @param ledgerName The name of the ledger you want to connect to. This is a mandatory parameter.
      * @param qldbClientOptions The object containing options for configuring the low level client.
      *                          See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/QLDBSession.html#constructor-details|Low Level Client Constructor}.
-     * @param ledgerName The QLDB ledger name.
-     * @param retryLimit The number of automatic retries for statement executions using convenience methods on sessions
-                         when an OCC conflict or retriable exception occurs. This value must not be negative.
-     * @param poolLimit The session pool limit. Set to `undefined` to use the maximum sockets from the `globalAgent`.
-     * @param timeoutMillis The timeout in milliseconds while attempting to retrieve a session from the session pool.
-     * @throws RangeError if `retryLimit` is less than 0 or `poolLimit` is greater than the client limit.
+     * @param retryLimit When there is a failure while executing the transaction like OCC or any other retriable failure, the driver will try running your transaction block again.
+     *                   This parameter tells the driver how many times to retry when there are failures. The value must be greater than 0. The default value is 4.
+     *                   See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
+     * @param poolLimit The driver internally uses a pool of sessions to execute the transactions. The poolLimit parameter specifies the number of sessions that the driver can hold
+     *                  in the pool. The default is set to maximum number of sockets specified in the globalAgent.
+     *                  See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
+     * @param timeoutMillis The number of ms the driver should wait for a session to be available in the pool before giving up. The default value is 30000.
+     * @throws RangeError if `retryLimit` is less than 0.
      */
     constructor(
         ledgerName: string,
@@ -115,28 +124,35 @@ export class PooledQldbDriver {
         this._semaphore = new Semaphore(this._poolLimit);
     }
 
-    /**
-     * Close this driver and any sessions in the pool.
-     */
-    close(): void {
-        this._sessionPool.forEach(session => {
-            session.endSession();
-        });
-        this._isClosed = true;
-    }
 
     /**
-     * Implicitly start a transaction within a new session, execute the lambda, commit the transaction, and close the
-     * session, retrying up to the retry limit if an OCC conflict or retriable exception occurs.
+     * This is the primary method to execute a transaction against Amazon QLDB ledger.
      *
-     * @param transactionLambda A lambda representing the block of code to be executed within the transaction. This cannot
-     *                    have any side effects as it may be invoked multiple times, and the result cannot be trusted
-     *                    until the transaction is committed.
-     * @param retryIndicator An optional lambda that is invoked when the `querylambda` is about to be retried due to an
-     *                       OCC conflict or retriable exception.
-     * @returns Promise which fulfills with the return value of the `queryLambda` which could be a {@linkcode Result}
-     *          on the result set of a statement within the lambda.
-     * @throws {@linkcode DriverClosedError} when this driver is closed.
+     * When this method is invoked, the driver will acquire a `Transaction` and hand it to the `TransactionExecutor` you
+     * passed via the `transactionFunction` parameter. Once the `transactionFunction`'s execution is done, the driver will try to
+     * commit the transaction.
+     * If there is a failure along the way, the driver will retry the entire transaction block. This would mean that your code inside the
+     * `transactionFunction` function should be idempotent.
+     *
+     * You can also return the results from the `transactionFunction`. Here is an example code of executing a transaction
+     *
+     * ```
+     * let result = driver.executeLambda(async (txn:TransactionExecutor) => {
+     *   let a = await txn.execute("SELECT a from Table1");
+     *   let b = await txn.execute("SELECT b from Table2");
+     *   return {a: a, b: b};
+     * });
+     *```
+     *
+     * Please keep in mind that the entire transaction will be committed once all the code inside the `transactionFunction` is executed.
+     * So for the above example the values inside the  transactionFunction, a and b, are speculative values. If the commit of the transaction fails,
+     * the entire `transactionFunction` will be retried.
+     *
+     * The function passed via retryIndicator parameter is invoked whenever there is a failure and the driver is about to retry the transaction.
+     * The retryIndicator will be called with the current attempt number.
+     *
+     * @param transactionFunction The function representing a transaction to be executed. Please see the method docs to understand the usage of this parameter.
+     * @param retryIndicator An Optional function which will be invoked when the `transactionFunction` is about to be retried due to a failure.
      */
     async executeLambda(
         transactionLambda: (transactionExecutor: TransactionExecutor) => any,
@@ -147,11 +163,11 @@ export class PooledQldbDriver {
             try  {
                 session = await this.getSession();
                 return await session.executeLambda(transactionLambda, retryIndicator);
-            } catch(e) {
-                if (e instanceof StartTransactionError || isInvalidSessionException(e)) {
+            } catch(err) {
+                if (err instanceof StartTransactionError || isInvalidSessionException(err)) {
                     continue;
                 }
-                throw e;
+                throw err;
             } finally {
                 if (session != null) {
                     //CFR: In the follow-up CR when we change the pooleing
@@ -162,7 +178,7 @@ export class PooledQldbDriver {
     }
 
     /**
-     * Lists all tables in the ledger.
+     * A helper method to get all the table names in a ledger.
      * @returns Promise which fulfills with an array of table names.
      */
     async getTableNames(): Promise<string[]> {
@@ -177,13 +193,18 @@ export class PooledQldbDriver {
     }
 
     /**
-     * This method will attempt to retrieve an active, existing session, or it will start a new session with QLDB if
-     * none are available and the session pool limit has not been reached. If the pool limit has been reached, it will
-     * attempt to retrieve a session from the pool until the timeout is reached.
-     * @returns Promise which fulfills with a QldbSession.
-     * @throws {@linkcode DriverClosedError} when this driver is closed.
-     * @throws {@linkcode SessionPoolEmptyError} if the timeout is reached while attempting to retrieve a session.
+     * This is a driver shutdown method which closes all the sessions and marks the driver as closed.
+     * Once the driver is closed, no transactions can be executed on that driver instance.
+     *
+     * Note: There is no corresponding `open` method and the only option is to instantiate another driver.
      */
+    close(): void {
+        this._sessionPool.forEach(session => {
+            session.endSession();
+        });
+        this._isClosed = true;
+    }
+
     private async getSession(): Promise<QldbSession> {
         this._throwIfClosed();
         debug(
@@ -209,9 +230,6 @@ export class PooledQldbDriver {
         throw new SessionPoolEmptyError(this._timeoutMillis)
     }
 
-    /**
-     * Release a session back into the pool.
-     */
     private _returnSessionToPool = (session: QldbSession): void => {
         if (session.isSessionOpen()) {
             this._sessionPool.push(session);
@@ -221,21 +239,12 @@ export class PooledQldbDriver {
         debug(`Session returned to pool; size is now ${this._sessionPool.length}.`);
     };
 
-    /**
-     * Check and throw if this driver is closed.
-     * @throws {@linkcode DriverClosedError} when this driver is closed.
-     */
     private _throwIfClosed(): void {
         if (this._isClosed) {
             throw new DriverClosedError();
         }
     }
 
-    /**
-     * Create and return a newly instantiated QldbSession object. This will implicitly start a new session with QLDB.
-     * @returns Promise which fulfills with a QldbSession.
-     * @throws {@linkcode DriverClosedError} when this driver is closed.
-     */
     private async _createSession(): Promise<QldbSession> {
         this._throwIfClosed();
         debug("Creating a new session.");

@@ -1,13 +1,8 @@
 # Amazon QLDB Node.js Driver
 
-[![NPM Version](https://img.shields.io/badge/npm-v1.0.0--rc.1-green)](https://www.npmjs.com/package/amazon-qldb-driver-nodejs) 
-[![Documentation](https://img.shields.io/badge/docs-api-green.svg)](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.nodejs.html)
+[![NPM Version](https://img.shields.io/badge/npm-v1.0.0-green)](https://www.npmjs.com/package/amazon-qldb-driver-nodejs)  [![Documentation](https://img.shields.io/badge/docs-api-green.svg)](https://docs.aws.amazon.com/qldb/latest/developerguide/getting-started.nodejs.html)
 
-This is the Node.js driver for Amazon Quantum Ledger Database (QLDB), which allows Node.js developers
-to write software that makes use of AmazonQLDB.
-
-**This is a preview release of the Amazon QLDB Driver for Node.js, and we do not recommend that it be used for production purposes.**
-
+This is the Node.js driver for Amazon Quantum Ledger Database (QLDB), which allows Node.js developers to write software that makes use of AmazonQLDB.
 
 ## Requirements
 
@@ -16,7 +11,7 @@ to write software that makes use of AmazonQLDB.
 See [Accessing Amazon QLDB](https://docs.aws.amazon.com/qldb/latest/developerguide/accessing.html) for information on connecting to AWS.
 
 The JavaScript AWS SDK needs to have AWS_SDK_LOAD_CONFIG environment variable set to a truthy value in order to read
-from the ~./.aws/config file.
+from the ~/.aws/config file.
 
 See [Setting Region](https://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/setting-region.html) page for more information.
 
@@ -48,18 +43,16 @@ Then from within your package, you can now use the driver by importing it. This 
 specifying the QLDB ledger name and a specific region:
 
 ```javascript
-import { PooledQldbDriver, QldbSession } from "amazon-qldb-driver-nodejs";
+import { QldbDriver } from "amazon-qldb-driver-nodejs";
 
 const testServiceConfigOptions = {
     region: "us-east-1"
 };
 
-const qldbDriver: PooledQldbDriver = new PooledQldbDriver("testLedger", testServiceConfigOptions));
-const qldbSession: QldbSession = await qldbDriver.getSession();
-
-for (const table of await qldbSession.getTableNames()) {
-    console.log(table);
-}
+const qldbDriver: QldbDriver = new QldbDriver("testLedger", testServiceConfigOptions);
+qldbDriver.getTableNames().then(function(tableNames: string[]) {
+    console.log(tableNames);
+});
 ```
 
 ### See Also
@@ -94,17 +87,15 @@ or
 
 ```npm run testWithCoverage```
 
-### Contract Tests
+### Integration Tests
 
 You can run the integration tests with this command:
 
-```npm run contractTest```
+```npm run integrationTest```
 
 This command requires that credentials are pre-configured and it has the required permissions.
 
-Additionally, a region can be specified:
-
-```npm run contractTest us-east-2```
+Additionally, a region can be specified in: `src/integrationtest/.mocharc.json`.
 
 ### Documentation 
 

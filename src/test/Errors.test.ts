@@ -31,7 +31,8 @@ import {
     LambdaAbortedError,
     SessionClosedError,
     SessionPoolEmptyError,
-    TransactionClosedError
+    TransactionClosedError,
+    StartTransactionError
 } from "../errors/Errors";
 import * as LogUtil from "../LogUtil";
 
@@ -110,6 +111,15 @@ describe("Errors", () => {
         });
     });
 
+    describe("#StartTransactionError", () => {
+        it("should be a StartTransactionError when new StartTransactionError created", () => {
+            const logSpy = sandbox.spy(LogUtil, "error");
+            const error = new StartTransactionError();
+            chai.expect(error).to.be.instanceOf(StartTransactionError);
+            chai.assert.equal(error.name, "StartTransactionError");
+            sinon.assert.calledOnce(logSpy);
+        });
+    });
     describe("#isInvalidParameterException()", () => {
         it("should return true when error is an InvalidParameterException", () => {
             mockError.code = "InvalidParameterException";
