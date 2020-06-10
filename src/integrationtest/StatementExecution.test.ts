@@ -17,7 +17,7 @@ import * as chaiAsPromised from "chai-as-promised";
 import { dom, IonType } from "ion-js";
 
 import { isOccConflictException } from "../errors/Errors";
-import { PooledQldbDriver } from "../PooledQldbDriver";
+import { QldbDriver } from "../QldbDriver";
 import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
 import * as constants from "./TestConstants";
@@ -29,7 +29,7 @@ chai.use(chaiAsPromised);
 describe("StatementExecution", function() {
     this.timeout(0);
     let testUtils: TestUtils; 
-    let driver: PooledQldbDriver;
+    let driver: QldbDriver;
 
     before(async () => {
         testUtils = new TestUtils(constants.LEDGER_NAME);
@@ -37,7 +37,7 @@ describe("StatementExecution", function() {
         await testUtils.runForceDeleteLedger();
         await testUtils.runCreateLedger();
 
-        driver = new PooledQldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration());
+        driver = new QldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration());
 
         // Create table
         const statement: string = `CREATE TABLE ${constants.TABLE_NAME}`;
@@ -71,16 +71,8 @@ describe("StatementExecution", function() {
         chai.assert.equal(createTableCount, 1); 
 
         // List tables in ledger to ensure table is created
-        let tables: string[] = await driver.executeLambda(async (txn: TransactionExecutor): Promise<string[]> => {
-            const tableNameStatement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
-            const result: Result = await txn.execute(tableNameStatement);
-            const resultSet: dom.Value[] = result.getResultList();
-            return resultSet.map((value: dom.Value) => {
-                // Get the value of the table name from the key: value struct returned from QLDB
-                return value.elements()[0].stringValue();
-            });
-        });
-        chai.assert.isTrue(tables.includes(constants.CREATE_TABLE_NAME));
+        const firstListTablesResult: string[] = await driver.getTableNames()
+        chai.assert.isTrue(firstListTablesResult.includes(constants.CREATE_TABLE_NAME));
 
         // Drop table
         const dropTableStatement: string = `DROP TABLE ${constants.CREATE_TABLE_NAME}`;
@@ -92,28 +84,12 @@ describe("StatementExecution", function() {
         chai.assert.equal(dropTableCount, 1); 
 
         // List tables in ledger to ensure table is dropped
-        tables = await driver.executeLambda(async (txn: TransactionExecutor): Promise<string[]> => {
-            const tableNameStatement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
-            const result: Result = await txn.execute(tableNameStatement);
-            const resultSet: dom.Value[] = result.getResultList();
-            return resultSet.map((value: dom.Value) => {
-                // Get the value of the table name from the key: value struct returned from QLDB
-                return value.elements()[0].stringValue();
-            });
-        });
-        chai.assert.isFalse(tables.includes(constants.CREATE_TABLE_NAME));
+        const secondListTablesResult: string[] = await driver.getTableNames()
+        chai.assert.isFalse(secondListTablesResult.includes(constants.CREATE_TABLE_NAME));
     });
 
     it("Can return a list of table names", async () => {
-        const tables: string[] = await driver.executeLambda(async (txn: TransactionExecutor): Promise<string[]> => {
-            const tableNameStatement: string = "SELECT name FROM information_schema.user_tables WHERE status = 'ACTIVE'";
-            const result: Result = await txn.execute(tableNameStatement);
-            const resultSet: dom.Value[] = result.getResultList();
-            return resultSet.map((value: dom.Value) => {
-                // Get the value of the table name from the key: value struct returned from QLDB
-                return value.elements()[0].stringValue();
-            });
-        });
+        const tables: string[] = await driver.getTableNames();
         chai.assert.equal(tables[0], constants.TABLE_NAME);
     });
 
@@ -134,9 +110,14 @@ describe("StatementExecution", function() {
         });
         chai.assert.equal(count, 1);
 
-        const searchStatement = `SELECT VALUE indexes[0] FROM information_schema.user_tables WHERE status = 'ACTIVE' AND name = '${constants.TABLE_NAME}'`;
+        const searchStatement = `SELECT VALUE indexes[0] FROM information_schema.user_tables WHERE status = 'ACTIVE'` +
+            `AND name = '${constants.TABLE_NAME}'`;
         const indexColumn: string = await driver.executeLambda(async (txn: TransactionExecutor) => {
             const result: Result = await txn.execute(searchStatement);
+            // This gives:
+            // {
+            //    expr: "[MyColumn]"
+            // }
             const indexColumn: string = result.getResultList()[0].elements()[0].stringValue();
             return indexColumn;
         });
@@ -161,9 +142,10 @@ describe("StatementExecution", function() {
         });
         chai.assert.equal(count, 1);
 
-        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}`;
+        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME} WHERE ` +
+            `${constants.COLUMN_NAME} = ?`;
         const value: string = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            return (await txn.execute(searchQuery)).getResultList()[0].stringValue();
+            return (await txn.execute(searchQuery, constants.SINGLE_DOCUMENT_VALUE)).getResultList()[0].stringValue();
         });
         chai.assert.equal(value, constants.SINGLE_DOCUMENT_VALUE);
     });
@@ -177,10 +159,11 @@ describe("StatementExecution", function() {
             return (await txn.execute(insertStatement, struct)).getResultList().length;
         });
         chai.assert.equal(count, 1);
-
-        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM "${constants.TABLE_NAME}"`;
+            
+        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM "${constants.TABLE_NAME}" WHERE ` +
+            `${constants.COLUMN_NAME} = ?`;
         const value: string = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            return (await txn.execute(searchQuery)).getResultList()[0].stringValue();
+            return (await txn.execute(searchQuery, constants.SINGLE_DOCUMENT_VALUE)).getResultList()[0].stringValue();
         });
         chai.assert.equal(value, constants.SINGLE_DOCUMENT_VALUE);
     });
@@ -198,32 +181,7 @@ describe("StatementExecution", function() {
         });
         chai.assert.equal(count, 2);
 
-        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}`;
-        const tables: string[] = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            const result: Result = await txn.execute(searchQuery);
-            const resultSet: dom.Value[] = result.getResultList();
-            return resultSet.map((value: dom.Value) => {
-                return value.stringValue();
-            });
-        });
-        chai.assert.isTrue(tables.includes(constants.MULTI_DOC_VALUE_1));
-        chai.assert.isTrue(tables.includes(constants.MULTI_DOC_VALUE_2));
-    });
-
-    it("Can query a table using parameters", async () => {
-        const struct1: Record<string, string> = {
-            [constants.COLUMN_NAME]: constants.MULTI_DOC_VALUE_1
-        };
-        const struct2: Record<string, string> = {
-            [constants.COLUMN_NAME]: constants.MULTI_DOC_VALUE_2
-        };
-        const insertStatement: string = `INSERT INTO ${constants.TABLE_NAME} <<?,?>>`;
-        const count: number = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            return (await txn.execute(insertStatement, struct1, struct2)).getResultList().length;
-        });
-        chai.assert.equal(count, 2);
-
-        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME} WHERE ` +
+        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME} WHERE ` + 
             `${constants.COLUMN_NAME} IN (?,?)`;
         const tables: string[] = await driver.executeLambda(async (txn: TransactionExecutor) => {
             const result: Result = await txn.execute(searchQuery, constants.MULTI_DOC_VALUE_1, constants.MULTI_DOC_VALUE_2);
@@ -246,16 +204,21 @@ describe("StatementExecution", function() {
         });
         chai.assert.equal(count, 1);
 
-        const deleteStatement: string = `DELETE FROM ${constants.TABLE_NAME} WHERE ${constants.COLUMN_NAME} = '${constants.SINGLE_DOCUMENT_VALUE}'`;
+        const deleteStatement: string = `DELETE FROM ${constants.TABLE_NAME} WHERE ${constants.COLUMN_NAME} = ?`;
         const deleteCount: number = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            return (await txn.execute(deleteStatement)).getResultList().length;
+            return (await txn.execute(deleteStatement, constants.SINGLE_DOCUMENT_VALUE)).getResultList().length;
         });
         chai.assert.equal(deleteCount, 1);
 
-        const searchQuery: string = `SELECT * FROM ${constants.TABLE_NAME}`;
+        const searchQuery: string = `SELECT COUNT(*) FROM ${constants.TABLE_NAME}`;
         const searchCount: number = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            return (await txn.execute(searchQuery)).getResultList().length;
+            // This gives:
+            // {
+            //    _1: 1
+            // }
+            return (await txn.execute(searchQuery)).getResultList()[0].elements()[0].numberValue();
         });
+
         chai.assert.equal(searchCount, 0);
     });
 
@@ -278,9 +241,13 @@ describe("StatementExecution", function() {
         });
         chai.assert.equal(deleteCount, 2);
 
-        const searchQuery: string = `SELECT * FROM ${constants.TABLE_NAME}`;
+        const searchQuery: string = `SELECT COUNT(*) FROM ${constants.TABLE_NAME}`;
         const searchCount: number = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            return (await txn.execute(searchQuery)).getResultList().length;
+            // This gives:
+            // {
+            //    _1: 1
+            // }
+            return (await txn.execute(searchQuery)).getResultList()[0].elements()[0].numberValue();
         });
         chai.assert.equal(searchCount, 0);
     });
@@ -296,8 +263,8 @@ describe("StatementExecution", function() {
         chai.assert.equal(result, 1);
         
         // Create a driver that does not retry OCC errors
-        const noRetryDriver: PooledQldbDriver = new PooledQldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration(), 0);
-        async function updateField(driver: PooledQldbDriver): Promise<void> {
+        const noRetryDriver: QldbDriver = new QldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration(), 0);
+        async function updateField(driver: QldbDriver): Promise<void> {
             await driver.executeLambda(async (txn: TransactionExecutor) => {
                 let currentValue: number;
                 
@@ -333,13 +300,26 @@ describe("StatementExecution", function() {
         chai.assert.equal(result, 1);
 
         // Read the Ion Value
-        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}`;
-        const returnedValue: IonType = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            const result: Result = await txn.execute(searchQuery);
-            const resultSet: dom.Value[] = result.getResultList();
-            return resultSet[0].getType();
-        });
-        chai.assert.equal(returnedValue, value.getType());
+        if (value.isNull()) {
+            const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}` + 
+                ` WHERE ${constants.COLUMN_NAME} IS NULL`;
+            const returnedValue: IonType = await driver.executeLambda(async (txn: TransactionExecutor) => {
+                const result: Result = await txn.execute(searchQuery);
+                const resultSet: dom.Value[] = result.getResultList();
+                return resultSet[0].getType();
+            });
+            chai.assert.equal(returnedValue, value.getType());
+
+        } else {
+            const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}` + 
+            ` WHERE ${constants.COLUMN_NAME} = ?`;
+            const returnedValue: IonType = await driver.executeLambda(async (txn: TransactionExecutor) => {
+                const result: Result = await txn.execute(searchQuery, value);
+                const resultSet: dom.Value[] = result.getResultList();
+                return resultSet[0].getType();
+            });
+            chai.assert.equal(returnedValue, value.getType());
+        }
     });
 
     itParam("Can update different Ion types", TestUtils.getIonTypes(), async (value: dom.Value) => {
@@ -361,13 +341,26 @@ describe("StatementExecution", function() {
         chai.assert.equal(updateResult, 1);
         
         // Read the Ion Value
-        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}`;
-        const returnedValue: IonType = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            const result: Result = await txn.execute(searchQuery);
-            const resultSet: dom.Value[] = result.getResultList();
-            return resultSet[0].getType();
-        });
-        chai.assert.equal(returnedValue, value.getType());
+        if (value.isNull()) {
+            const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}` + 
+                ` WHERE ${constants.COLUMN_NAME} IS NULL`;
+            const returnedValue: IonType = await driver.executeLambda(async (txn: TransactionExecutor) => {
+                const result: Result = await txn.execute(searchQuery);
+                const resultSet: dom.Value[] = result.getResultList();
+                return resultSet[0].getType();
+            });
+            chai.assert.equal(returnedValue, value.getType());
+
+        } else {
+            const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}` + 
+                ` WHERE ${constants.COLUMN_NAME} = ?`;
+            const returnedValue: IonType = await driver.executeLambda(async (txn: TransactionExecutor) => {
+                const result: Result = await txn.execute(searchQuery, value);
+                const resultSet: dom.Value[] = result.getResultList();
+                return resultSet[0].getType();
+            });
+            chai.assert.equal(returnedValue, value.getType());
+        }
     });
 
     it("Statements are executed without needing a returned value", async () => {
@@ -379,9 +372,10 @@ describe("StatementExecution", function() {
             return (await txn.execute(insertStatement, struct)).getResultList().length;
         });
 
-        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME}`;
+        const searchQuery: string = `SELECT VALUE ${constants.COLUMN_NAME} FROM ${constants.TABLE_NAME} WHERE ` + 
+            `${constants.COLUMN_NAME} = ?`;
         const value: string = await driver.executeLambda(async (txn: TransactionExecutor) => {
-            return (await txn.execute(searchQuery)).getResultList()[0].stringValue();
+            return (await txn.execute(searchQuery, constants.SINGLE_DOCUMENT_VALUE)).getResultList()[0].stringValue();
         });
         chai.assert.equal(value, constants.SINGLE_DOCUMENT_VALUE);
     });

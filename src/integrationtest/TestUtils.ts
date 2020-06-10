@@ -23,6 +23,7 @@ import {
 } from "aws-sdk/clients/qldb";
 import { dom, load } from "ion-js";
 
+import * as mocharc from './.mocharc.json'
 import { isResourceNotFoundException } from "../errors/Errors";
 
 export class TestUtils {
@@ -33,10 +34,7 @@ export class TestUtils {
 
     constructor(ledgerName: string) {
         this.ledgerName = ledgerName;
-        if (process.argv.length == 6) {
-            this.regionName = process.argv[5];
-        }
-
+        this.regionName = mocharc.region;
         this.clientConfig = this.createClientConfiguration();
         this.qldbClient = new QLDB(this.clientConfig);
     }
@@ -139,19 +137,86 @@ export class TestUtils {
 
     static getIonTypes(): dom.Value[] {
         const values: dom.Value[] = [];
-        values.push(load("null"));
-        values.push(dom.Value.from(true));
-        values.push(dom.Value.from(1));
-        values.push(dom.Value.from(3.2));
-        values.push(dom.load("5.5"));
-        values.push(dom.load("2020-02-02"));
-        values.push(dom.load("abc123"));
-        values.push(dom.load("\"string\""));
-        values.push(dom.load("{{ \"clob\" }}"));
-        values.push(dom.load("{{ blob }}"));
-        values.push(dom.load("(1 2 3)"));
-        values.push(dom.load("[1, 2, 3]"));
-        values.push(dom.load("{brand: ford}"));
+
+        const ionClob: dom.Value = load('{{"This is a CLOB of text."}}');
+        values.push(ionClob);
+        const ionBlob: dom.Value = load('{{aGVsbG8=}}');
+        values.push(ionBlob);
+        const ionBool: dom.Value = load('true');
+        values.push(ionBool);
+        const ionDecimal: dom.Value = load('0.1');
+        values.push(ionDecimal);
+        const ionFloat: dom.Value = load('0.2e0');
+        values.push(ionFloat);
+        const ionInt: dom.Value = load('1');
+        values.push(ionInt);
+        const ionList: dom.Value = load('[1,2]');
+        values.push(ionList);
+        const ionNull: dom.Value = load('null');
+        values.push(ionNull);
+        const ionSexp: dom.Value = load('(cons 1 2)');
+        values.push(ionSexp);
+        const ionString: dom.Value = load('"string"');
+        values.push(ionString);
+        const ionStruct: dom.Value = load('{a:1}');
+        values.push(ionStruct);
+        const ionSymbol: dom.Value = load('abc');
+        values.push(ionSymbol);
+        const ionTimestamp: dom.Value = load('2016-12-20T05:23:43.000000-00:00');
+        values.push(ionTimestamp);
+
+        const ionNullClob: dom.Value = load('null.clob');
+        values.push(ionNullClob);
+        const ionNullBlob: dom.Value = load('null.blob');
+        values.push(ionNullBlob);
+        const ionNullBool: dom.Value = load('null.bool');
+        values.push(ionNullBool);
+        const ionNullDecimal: dom.Value = load('null.decimal');
+        values.push(ionNullDecimal);
+        const ionNullFloat: dom.Value = load('null.float');
+        values.push(ionNullFloat);
+        const ionNullInt: dom.Value = load('null.int');
+        values.push(ionNullInt);
+        const ionNullList: dom.Value = load('null.list');
+        values.push(ionNullList);
+        const ionNullSexp: dom.Value = load('null.sexp');
+        values.push(ionNullSexp);
+        const ionNullString: dom.Value = load('null.string');
+        values.push(ionNullString);
+        const ionNullStruct: dom.Value = load('null.struct');
+        values.push(ionNullStruct);
+        const ionNullSymbol: dom.Value = load('null.symbol');
+        values.push(ionNullSymbol);
+        const ionNullTimestamp: dom.Value = load('null.timestamp');
+        values.push(ionNullTimestamp);
+
+        const ionClobWithAnnotation: dom.Value = load('annotation::{{"This is a CLOB of text."}}');
+        values.push(ionClobWithAnnotation);
+        const ionBlobWithAnnotation: dom.Value = load('annotation::{{aGVsbG8=}}');
+        values.push(ionBlobWithAnnotation);
+        const ionBoolWithAnnotation: dom.Value = load('annotation::true');
+        values.push(ionBoolWithAnnotation);
+        const ionDecimalWithAnnotation: dom.Value = load('annotation::0.1');
+        values.push(ionDecimalWithAnnotation);
+        const ionFloatWithAnnotation: dom.Value = load('annotation::0.2e0');
+        values.push(ionFloatWithAnnotation);
+        const ionIntWithAnnotation: dom.Value = load('annotation::1');
+        values.push(ionIntWithAnnotation);
+        const ionListWithAnnotation: dom.Value = load('annotation::[1,2]');
+        values.push(ionListWithAnnotation);
+        const ionNullWithAnnotation: dom.Value = load('annotation::null');
+        values.push(ionNullWithAnnotation);
+        const ionSexpWithAnnotation: dom.Value = load('annotation::(cons 1 2)');
+        values.push(ionSexpWithAnnotation);
+        const ionStringWithAnnotation: dom.Value = load('annotation::"string"');
+        values.push(ionStringWithAnnotation);
+        const ionStructWithAnnotation: dom.Value = load('annotation::{a:1}');
+        values.push(ionStructWithAnnotation);
+        const ionSymbolWithAnnotation: dom.Value = load('annotation::abc');
+        values.push(ionSymbolWithAnnotation);
+        const ionTimestampWithAnnotation: dom.Value = load('annotation::2016-12-20T05:23:43.000000-00:00');
+        values.push(ionTimestampWithAnnotation);
+ 
         return values;
     }
 }

@@ -14,7 +14,7 @@
         "index.ts"
     ],
     "exclude": [
-        "src/contract/*",
-        "src/test/*"
+        "src/test/*",
+        "src/integrationtest/*"
     ]
 }
