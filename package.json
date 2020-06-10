@@ -6,7 +6,7 @@
   },
   "name": "amazon-qldb-driver-nodejs",
   "description": "The Node.js driver for working with Amazon Quantum Ledger Database",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "engines": {
@@ -48,7 +48,7 @@
     "prepublishOnly": "npm run build",
     "test": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"strict\\\":false} mocha -r ts-node/register src/test/*.test.ts",
     "testWithCoverage": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"strict\\\":false} nyc -r lcov -e .ts -x \"*.test.ts\" mocha -r ts-node/register src/test/*.test.ts && nyc report",
-    "contractTest": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"strict\\\":false} mocha -r ts-node/register src/contract/*.test.ts"
+    "integrationTest": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"strict\\\":false} mocha -r ts-node/register src/integrationtest/*.test.ts"
   },
   "author": {
     "name": "Amazon Web Services",
