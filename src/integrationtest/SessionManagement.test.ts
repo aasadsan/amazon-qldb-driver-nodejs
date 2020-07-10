@@ -23,6 +23,7 @@ import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
 import * as constants from "./TestConstants";
 import { TestUtils } from "./TestUtils";
+import { defaultRetryPolicy } from "../retry/DefaultRetryPolicy";
 
 chai.use(chaiAsPromised);
 
@@ -82,9 +83,9 @@ describe("SessionManagement", function() {
         }
     });
 
-    it("Throws exception when all the sessions are busy, pool limit is reached, and timeout is exceeded", async () => {
+    it("Throws exception when all the sessions are busy and pool limit is reached", async () => {
         // Set the timeout to 1ms and pool limit to 1
-        const driver: QldbDriver = new  QldbDriver(constants.LEDGER_NAME, config, undefined, 1, 1);
+        const driver: QldbDriver = new  QldbDriver(constants.LEDGER_NAME, config, 1, defaultRetryPolicy);
         try {
             // Execute and do not wait for the promise to resolve, exhausting the pool
             driver.executeLambda(async (txn: TransactionExecutor) => {
@@ -99,23 +100,6 @@ describe("SessionManagement", function() {
             if (!(e instanceof SessionPoolEmptyError)) {
                 throw e;
             }
-        } finally {
-            driver.close();
-        }
-    });
-
-    it("Can get a session when the pool has no sessions, pool limit is reached, but a session is returned within the timeout", async () => {
-        // Set the timeout to 30000ms and pool limit to 1
-        const driver: QldbDriver = new  QldbDriver(constants.LEDGER_NAME, config, undefined, 1, 30000);
-        try {
-            // Execute and do not wait for the promise to resolve, exhausting the pool
-            await driver.executeLambda(async (txn: TransactionExecutor) => {
-                await txn.execute(`SELECT name FROM ${constants.TABLE_NAME} WHERE name='Bob'`);
-            });
-            // Attempt to implicitly get a session by executing, waiting for up to 30000ms
-            await driver.executeLambda(async (txn: TransactionExecutor) => {
-                await txn.execute(`SELECT name FROM ${constants.TABLE_NAME} WHERE name='Bob'`);
-            });
         } finally {
             driver.close();
         }

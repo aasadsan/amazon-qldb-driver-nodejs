@@ -26,18 +26,20 @@ import { Result } from "./Result";
 import { ResultStream } from "./ResultStream";
 import { Transaction } from "./Transaction";
 import { TransactionExecutor } from "./TransactionExecutor";
+import { RetryPolicy } from "./retry/RetryPolicy";
+import { TransactionExecutionContext } from "./TransactionExecutionContext";
+import { BackoffFunction } from "./retry/BackoffFunction";
+import { AWSError } from "aws-sdk";
 
 const SLEEP_CAP_MS: number = 5000;
 const SLEEP_BASE_MS: number = 10;
 
 export class QldbSession {
     private _communicator: Communicator;
-    private _retryLimit: number;
     private _isClosed: boolean;
 
-    constructor(communicator: Communicator, retryLimit: number) {
+    constructor(communicator: Communicator) {
         this._communicator = communicator;
-        this._retryLimit = retryLimit;
         this._isClosed = false;
     }
 
@@ -55,13 +57,13 @@ export class QldbSession {
 
     async executeLambda(
         transactionLambda: (transactionExecutor: TransactionExecutor) => any,
-        retryIndicator?: (retryAttempt: number) => void
+        retryPolicy: RetryPolicy,
+        executionContext: TransactionExecutionContext,
     ): Promise<any> {
         let transaction: Transaction;
-        let retryAttempt: number = 0;
         while (true) {
+            transaction = null;
             try {
-                transaction = null;
                 transaction = await this.startTransaction();
                 const transactionExecutor = new TransactionExecutor(transaction);
                 let returnedValue: any = await transactionLambda(transactionExecutor);
@@ -71,30 +73,35 @@ export class QldbSession {
                 await transaction.commit();
                 return returnedValue;
             } catch (e) {
-                if (e instanceof StartTransactionError || e instanceof LambdaAbortedError) {
-                    throw e;
-                }
-
                 if (isInvalidSessionException(e)) {
                     this.closeSession();
                     throw e;
                 }
 
-                await this._noThrowAbort(transaction);
-                if (retryAttempt >= this._retryLimit) {
+                executionContext.setLastException(e);
+                this._noThrowAbort(transaction);
+
+                if (e instanceof LambdaAbortedError) {
+                    throw e;
+                }
+
+                if (e instanceof StartTransactionError) {
+                    if (executionContext.getExecutionAttempt() >= retryPolicy.getRetryLimit()) {
+                        throw e.cause;
+                    }
+                }
+
+                if (executionContext.getExecutionAttempt() >= retryPolicy.getRetryLimit()) {
                     throw e;
                 }
                 if (isOccConflictException(e) || isRetriableException(e)) {
                     warn(`OCC conflict or retriable exception occurred: ${e}.`);
-                    retryAttempt++;
-                    if (retryIndicator !== undefined) {
-                        retryIndicator(retryAttempt);
-                    }
-                    await this._retrySleep(retryAttempt);
                 } else {
                     throw e;
                 }
             }
+            executionContext.incrementExecutionAttempt();
+            await this._retrySleep(executionContext, retryPolicy, transaction);
         }
     }
 
@@ -116,13 +123,15 @@ export class QldbSession {
             );
             return transaction;
         } catch (e) {
-            throw new StartTransactionError();
+            throw new StartTransactionError(e);
         }
     }
 
     private async _noThrowAbort(transaction: Transaction): Promise<void> {
         try {
-            if (transaction) {
+            if (null == transaction) {
+                this._communicator.abortTransaction();
+            } else {
                 await transaction.abort();
             }
         } catch (e) {
@@ -130,25 +139,20 @@ export class QldbSession {
         }
     }
 
-    private _retrySleep(attemptNumber: number) {
-        const delayTime = this._calculateDelayTime(attemptNumber);
-        return this._sleep(delayTime);
-    }
-
-    private _calculateDelayTime(attemptNumber: number) {
-        const exponentialBackoff: number = Math.min(SLEEP_CAP_MS, Math.pow(2,  attemptNumber) * SLEEP_BASE_MS);
-        const jitterRand: number = this._getRandomArbitrary(0, (exponentialBackoff/2 + 1));
-        const delayTime: number = (exponentialBackoff/2) + jitterRand;
-        return delayTime;
+    private _retrySleep(executionContext: TransactionExecutionContext, retryPolicy: RetryPolicy, transaction: Transaction) {
+        let transactionId: string = (transaction != null) ? transaction.getTransactionId() : null;
+        const backoffFunction: BackoffFunction = retryPolicy.getBackOffFunction();
+        let backoffDelay: number = backoffFunction(executionContext.getExecutionAttempt(), executionContext.getLastException(), transactionId);
+        if (backoffDelay == null || backoffDelay < 0) {
+            backoffDelay = 0;
+        }
+        return this._sleep(backoffDelay);
     }
 
     private _sleep(sleepTime:number) {
         return new Promise(resolve => setTimeout(resolve, sleepTime));
     }
 
-    private _getRandomArbitrary(min:number, max:number) {
-        return Math.random() * (max - min) + min;
-    }
 
     private _throwIfClosed(): void {
         if (this._isClosed) {

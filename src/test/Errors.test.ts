@@ -114,7 +114,8 @@ describe("Errors", () => {
     describe("#StartTransactionError", () => {
         it("should be a StartTransactionError when new StartTransactionError created", () => {
             const logSpy = sandbox.spy(LogUtil, "error");
-            const error = new StartTransactionError();
+            let err: Error = new Error("Some BadRequest Exception")
+            const error = new StartTransactionError(err);
             chai.expect(error).to.be.instanceOf(StartTransactionError);
             chai.assert.equal(error.name, "StartTransactionError");
             sinon.assert.calledOnce(logSpy);
