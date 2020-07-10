@@ -1,0 +1,1 @@
+export type BackoffFunction =  (retryAttempt: number, error: Error, transactionId: string) => number;

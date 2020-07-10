@@ -29,6 +29,9 @@ import { debug } from "./LogUtil";
 import { QldbSession } from "./QldbSession";
 import { Result } from "./Result";
 import { TransactionExecutor } from "./TransactionExecutor";
+import { RetryPolicy } from "./retry/RetryPolicy";
+import { defaultRetryPolicy } from "./retry/DefaultRetryPolicy";
+import { TransactionExecutionContext } from "./TransactionExecutionContext";
 
 /**
   * This is the entry point for all interactions with Amazon QLDB.
@@ -48,15 +51,15 @@ import { TransactionExecutor } from "./TransactionExecutor";
   * Check the {@link QldbDriver.executeLambda} method for more details on how to execute the Transaction.
  */
 export class QldbDriver {
-    private _poolLimit: number;
+    private _maxConcurrentTransactions: number;
     private _timeoutMillis: number;
     private _availablePermits: number;
     private _sessionPool: QldbSession[];
     private _semaphore: Semaphore;
     protected _qldbClient: QLDBSession;
     protected _ledgerName: string;
-    protected _retryLimit: number;
     protected _isClosed: boolean;
+    protected _retryPolicy: RetryPolicy;
 
     /**
      * Creates a QldbDriver instance that can be used to execute transactions against Amazon QLDB. A single instance of the QldbDriver
@@ -68,7 +71,7 @@ export class QldbDriver {
      * @param retryLimit When there is a failure while executing the transaction like OCC or any other retriable failure, the driver will try running your transaction block again.
      *                   This parameter tells the driver how many times to retry when there are failures. The value must be greater than 0. The default value is 4.
      *                   See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
-     * @param poolLimit The driver internally uses a pool of sessions to execute the transactions. The poolLimit parameter specifies the number of sessions that the driver can hold
+     * @param maxConcurrentTransactions The driver internally uses a pool of sessions to execute the transactions. The maxConcurrentTransactions parameter specifies the number of sessions that the driver can hold
      *                  in the pool. The default is set to maximum number of sockets specified in the globalAgent.
      *                  See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
      * @param timeoutMillis The number of ms the driver should wait for a session to be available in the pool before giving up. The default value is 30000.
@@ -77,25 +80,18 @@ export class QldbDriver {
     constructor(
         ledgerName: string,
         qldbClientOptions: ClientConfiguration = {},
-        retryLimit: number = 4,
-        poolLimit: number = 0,
-        timeoutMillis: number = 30000
+        maxConcurrentTransactions: number = 0,
+        retryPolicy: RetryPolicy = defaultRetryPolicy
     ) {
-        if (retryLimit < 0) {
-            throw new RangeError("Value for retryLimit cannot be negative.");
-        }
         qldbClientOptions.customUserAgent = `QLDB Driver for Node.js v${version}`;
         qldbClientOptions.maxRetries = 0;
 
         this._qldbClient = new QLDBSession(qldbClientOptions);
         this._ledgerName = ledgerName;
-        this._retryLimit = retryLimit;
         this._isClosed = false;
+        this._retryPolicy = retryPolicy;
 
-        if (timeoutMillis < 0) {
-            throw new RangeError("Value for timeout cannot be negative.");
-        }
-        if (poolLimit < 0) {
+        if (maxConcurrentTransactions < 0) {
             throw new RangeError("Value for poolLimit cannot be negative.");
         }
 
@@ -106,22 +102,21 @@ export class QldbDriver {
             maxSockets = globalAgent.maxSockets;
         }
 
-        if (0 === poolLimit) {
-            this._poolLimit = maxSockets;
+        if (0 === maxConcurrentTransactions) {
+            this._maxConcurrentTransactions = maxSockets;
         } else {
-            this._poolLimit = poolLimit;
+            this._maxConcurrentTransactions = maxConcurrentTransactions;
         }
-        if (this._poolLimit > maxSockets) {
+        if (this._maxConcurrentTransactions > maxSockets) {
             throw new RangeError(
-                `The session pool limit given, ${this._poolLimit}, exceeds the limit set by the client,
+                `The session pool limit given, ${this._maxConcurrentTransactions}, exceeds the limit set by the client,
                  ${maxSockets}. Please lower the limit and retry.`
             );
         }
 
-        this._timeoutMillis = timeoutMillis;
-        this._availablePermits = this._poolLimit;
+        this._availablePermits = this._maxConcurrentTransactions;
         this._sessionPool = [];
-        this._semaphore = new Semaphore(this._poolLimit);
+        this._semaphore = new Semaphore(this._maxConcurrentTransactions);
     }
 
 
@@ -156,13 +151,15 @@ export class QldbDriver {
      */
     async executeLambda(
         transactionLambda: (transactionExecutor: TransactionExecutor) => any,
-        retryIndicator?: (retryAttempt: number) => void
+        retryPolicy?: RetryPolicy
     ): Promise<any> {
         let session: QldbSession = null;
+        retryPolicy = (retryPolicy == null) ? this._retryPolicy : retryPolicy;
+        const transactionExecutionContext: TransactionExecutionContext = new TransactionExecutionContext();
         while(true) {
             try  {
                 session = await this.getSession();
-                return await session.executeLambda(transactionLambda, retryIndicator);
+                return await session.executeLambda(transactionLambda, retryPolicy, transactionExecutionContext);
             } catch(err) {
                 if (err instanceof StartTransactionError || isInvalidSessionException(err)) {
                     continue;
@@ -211,7 +208,7 @@ export class QldbDriver {
             `Getting session. Current free session count: ${this._sessionPool.length}. ` +
             `Currently available permit count: ${this._availablePermits}.`
         );
-        const isPermitAcquired: boolean = await this._semaphore.waitFor(this._timeoutMillis);
+        const isPermitAcquired: boolean = this._semaphore.tryAcquire();
         if (isPermitAcquired) {
             this._availablePermits--;
             try {
@@ -249,6 +246,6 @@ export class QldbDriver {
         this._throwIfClosed();
         debug("Creating a new session.");
         const communicator: Communicator = await Communicator.create(this._qldbClient, this._ledgerName);
-        return new QldbSession(communicator, this._retryLimit);
+        return new QldbSession(communicator);
     }
 }

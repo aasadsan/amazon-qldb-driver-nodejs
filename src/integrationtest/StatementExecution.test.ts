@@ -22,6 +22,7 @@ import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
 import * as constants from "./TestConstants";
 import { TestUtils } from "./TestUtils";
+import { RetryPolicy } from "../retry/RetryPolicy";
 
 const itParam = require("mocha-param");
 chai.use(chaiAsPromised);
@@ -263,7 +264,8 @@ describe("StatementExecution", function() {
         chai.assert.equal(result, 1);
         
         // Create a driver that does not retry OCC errors
-        const noRetryDriver: QldbDriver = new QldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration(), 0);
+        const retryPolicy:RetryPolicy = new RetryPolicy(0);
+        const noRetryDriver: QldbDriver = new QldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration(), 3, retryPolicy);
         async function updateField(driver: QldbDriver): Promise<void> {
             await driver.executeLambda(async (txn: TransactionExecutor) => {
                 let currentValue: number;

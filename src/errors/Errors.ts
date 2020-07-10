@@ -61,8 +61,7 @@ export class SessionClosedError extends Error {
 export class SessionPoolEmptyError extends Error {
     constructor(timeout: number) {
         const message: string =
-            `Session pool is empty after waiting for ${timeout} milliseconds. Please close existing sessions first ` +
-            "before retrying.";
+            "Session pool is empty. Please close existing sessions first before retrying.";
         super(message);
         Object.setPrototypeOf(this, SessionPoolEmptyError.prototype)
         this.message = message;
@@ -86,13 +85,15 @@ export class TransactionClosedError extends Error {
 
 //CFR: This is exception should be used only by the driver to move to next session in pool 
 export class StartTransactionError extends Error {
-    constructor() {
+    public cause: Error;
+    constructor(e: Error) {
         const message: string =
             "Failed to start a transaction. Either another transaction is already open on this session or something else went wrong. Please retry the transaction.";
         super(message);
         Object.setPrototypeOf(this, StartTransactionError.prototype)
         this.message = message;
         this.name = "StartTransactionError";
+        this.cause = e;
         error(message);
     }
 }
