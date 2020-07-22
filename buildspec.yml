@@ -25,4 +25,4 @@ phases:
     commands: 
       - echo Build completed on `date` 
       - npm run integrationTest
-      - echo Integration tests completed on `date
+      - echo Integration tests completed on `date`
