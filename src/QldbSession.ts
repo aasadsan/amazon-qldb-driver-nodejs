@@ -24,15 +24,11 @@ import {
 import { warn } from "./LogUtil";
 import { Result } from "./Result";
 import { ResultStream } from "./ResultStream";
+import { RetryPolicy } from "./retry/RetryPolicy";
 import { Transaction } from "./Transaction";
 import { TransactionExecutor } from "./TransactionExecutor";
-import { RetryPolicy } from "./retry/RetryPolicy";
 import { TransactionExecutionContext } from "./TransactionExecutionContext";
 import { BackoffFunction } from "./retry/BackoffFunction";
-import { AWSError } from "aws-sdk";
-
-const SLEEP_CAP_MS: number = 5000;
-const SLEEP_BASE_MS: number = 10;
 
 export class QldbSession {
     private _communicator: Communicator;

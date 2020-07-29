@@ -26,11 +26,11 @@ import {
     StartTransactionError
  } from "./errors/Errors";
 import { debug } from "./LogUtil";
+import { defaultRetryPolicy } from "./retry/DefaultRetryPolicy";
 import { QldbSession } from "./QldbSession";
 import { Result } from "./Result";
-import { TransactionExecutor } from "./TransactionExecutor";
 import { RetryPolicy } from "./retry/RetryPolicy";
-import { defaultRetryPolicy } from "./retry/DefaultRetryPolicy";
+import { TransactionExecutor } from "./TransactionExecutor";
 import { TransactionExecutionContext } from "./TransactionExecutionContext";
 
 /**
@@ -71,8 +71,8 @@ export class QldbDriver {
      * @param retryLimit When there is a failure while executing the transaction like OCC or any other retriable failure, the driver will try running your transaction block again.
      *                   This parameter tells the driver how many times to retry when there are failures. The value must be greater than 0. The default value is 4.
      *                   See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
-     * @param maxConcurrentTransactions The driver internally uses a pool of sessions to execute the transactions. The maxConcurrentTransactions parameter specifies the number of sessions that the driver can hold
-     *                  in the pool. The default is set to maximum number of sockets specified in the globalAgent.
+     * @param maxConcurrentTransactions The driver internally uses a pool of sessions to execute the transactions. The maxConcurrentTransactions parameter
+     *                  specifies the number of sessions that the driver can hold in the pool. The default is set to maximum number of sockets specified in the globalAgent.
      *                  See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
      * @param timeoutMillis The number of ms the driver should wait for a session to be available in the pool before giving up. The default value is 30000.
      * @throws RangeError if `retryLimit` is less than 0.
@@ -148,6 +148,7 @@ export class QldbDriver {
      *
      * @param transactionFunction The function representing a transaction to be executed. Please see the method docs to understand the usage of this parameter.
      * @param retryIndicator An Optional function which will be invoked when the `transactionFunction` is about to be retried due to a failure.
+     * TODO: Add exceptions which can be returned
      */
     async executeLambda(
         transactionLambda: (transactionExecutor: TransactionExecutor) => any,
