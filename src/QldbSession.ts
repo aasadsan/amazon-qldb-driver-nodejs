@@ -14,12 +14,13 @@
 import { StartTransactionResult } from "aws-sdk/clients/qldbsession";
 import { Communicator } from "./Communicator";
 import {
+    isBadRequestException,
     isInvalidSessionException,
     isOccConflictException,
     isRetriableException,
     LambdaAbortedError,
     SessionClosedError,
-    StartTransactionError
+    StartTransactionError,
 } from "./errors/Errors";
 import { warn } from "./LogUtil";
 import { Result } from "./Result";
@@ -69,29 +70,22 @@ export class QldbSession {
                 await transaction.commit();
                 return returnedValue;
             } catch (e) {
+                executionContext.setLastException(e);
                 if (isInvalidSessionException(e)) {
                     this.closeSession();
                     throw e;
                 }
 
-                executionContext.setLastException(e);
-                this._noThrowAbort(transaction);
-
-                if (e instanceof LambdaAbortedError) {
+                if (executionContext.getExecutionAttempt() >= retryPolicy.getRetryLimit()
+                    || e instanceof LambdaAbortedError) {
                     throw e;
                 }
 
-                if (e instanceof StartTransactionError) {
-                    if (executionContext.getExecutionAttempt() >= retryPolicy.getRetryLimit()) {
-                        throw e.cause;
-                    }
-                }
-
-                if (executionContext.getExecutionAttempt() >= retryPolicy.getRetryLimit()) {
-                    throw e;
-                }
-                if (isOccConflictException(e) || isRetriableException(e)) {
+                if (e instanceof StartTransactionError || isRetriableException(e) || isOccConflictException(e)) {
                     warn(`OCC conflict or retriable exception occurred: ${e}.`);
+                    if (!isOccConflictException(e)) {
+                        this._noThrowAbort(transaction);
+                    }
                 } else {
                     throw e;
                 }
@@ -119,7 +113,10 @@ export class QldbSession {
             );
             return transaction;
         } catch (e) {
-            throw new StartTransactionError(e);
+            if (isBadRequestException(e)) {
+                throw new StartTransactionError(e);
+            }
+            throw(e);
         }
     }
 
@@ -145,7 +142,7 @@ export class QldbSession {
         return this._sleep(backoffDelay);
     }
 
-    private _sleep(sleepTime:number) {
+    private _sleep(sleepTime: number) {
         return new Promise(resolve => setTimeout(resolve, sleepTime));
     }
 

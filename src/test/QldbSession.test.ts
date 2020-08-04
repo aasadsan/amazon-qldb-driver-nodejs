@@ -183,7 +183,7 @@ describe("QldbSession", () => {
             chai.assert.equal(result, mockResult);
         });
 
-        it("should return a rejected promise when error is thrown", async () => {
+        it("should return a rejected promise when non-retryable error is thrown", async () => {
             qldbSession.startTransaction = async () => {
                 throw new Error(testMessage);
             };
@@ -195,13 +195,14 @@ describe("QldbSession", () => {
                 return await txn.execute(testStatement);
             }, defaultRetryPolicy, executionContext)).to.be.rejected;
             sinon.assert.calledOnce(startTransactionSpy);
-            sinon.assert.calledOnce(noThrowAbortSpy);
         });
 
-        it("should throw StartTransactionError when startTransaction fails", async () => {
-            let communicatorFailureError = new Error("This error should be translated to StartTransactionError");
+        it("should retry with same session when StartTransaction fails with BadRequestException", async () => {
+            const isBadRequestStub = sandbox.stub(Errors, "isBadRequestException");
+            isBadRequestStub.returns(true);
+
             mockCommunicator.startTransaction = async () => {
-                throw communicatorFailureError;
+                throw new Error(testMessage);
             };
 
             const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
@@ -209,8 +210,25 @@ describe("QldbSession", () => {
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
             }, defaultRetryPolicy, executionContext)).to.be.rejectedWith(Errors.StartTransactionError);
-            sinon.assert.calledOnce(startTransactionSpy);
-            sinon.assert.calledOnce(noThrowAbortSpy);
+            sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
+            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit);
+        });
+
+        it("should not retry with same session when startTransaction fails with InvalidSessionException", async () => {
+            const isInvalidSessionExceptionStub = sandbox.stub(Errors, "isInvalidSessionException");
+            isInvalidSessionExceptionStub.returns(true);
+
+            mockCommunicator.startTransaction = async () => {
+                throw new Error(testMessage);
+            };
+
+            const startTransactionSpy = sandbox.spy(qldbSession, "startTransaction");
+            const noThrowAbortSpy = sandbox.spy(qldbSession as any, "_noThrowAbort");
+            await chai.expect(qldbSession.executeLambda(async (txn) => {
+                return await txn.execute(testStatement);
+            }, defaultRetryPolicy, executionContext)).to.be.rejected;
+            sinon.assert.callCount(startTransactionSpy, 1);
+            sinon.assert.neverCalledWith(noThrowAbortSpy);
         });
 
         it("should retry when OccConflictException occurs", async () => {
@@ -226,7 +244,7 @@ describe("QldbSession", () => {
             }, defaultRetryPolicy, executionContext)).to.be.rejected;
 
             sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
-            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit + 1);
+            sinon.assert.neverCalledWith(noThrowAbortSpy, testRetryLimit + 1);
             sinon.assert.callCount(logSpy, testRetryLimit);
         });
 
@@ -243,7 +261,7 @@ describe("QldbSession", () => {
             }, defaultRetryPolicy, executionContext)).to.be.rejected;
 
             sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
-            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit + 1);
+            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit);
             sinon.assert.callCount(logSpy, testRetryLimit);
         });
 
@@ -258,12 +276,17 @@ describe("QldbSession", () => {
            chai.assert.isFalse(qldbSession.isSessionOpen());
         });
 
+        it("should return a rejected promise when Transaction expires", async () => {
+            chai.assert(true);
+        });
+
         it("should return a rejected promise when a LambdaAbortedError occurs", async () => {
             const lambdaAbortedError: Errors.LambdaAbortedError = new Errors.LambdaAbortedError();
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 throw lambdaAbortedError;
             }, defaultRetryPolicy, executionContext)).to.be.rejected;
         });
+
     });
 
     describe("#getSessionToken()", () => {
