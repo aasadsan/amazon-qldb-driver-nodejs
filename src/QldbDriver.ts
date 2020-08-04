@@ -22,6 +22,7 @@ import { Communicator } from "./Communicator";
 import { 
     DriverClosedError, 
     isInvalidSessionException,
+    isTransactionExpiredException,
     SessionPoolEmptyError,
     StartTransactionError
  } from "./errors/Errors";
@@ -92,7 +93,7 @@ export class QldbDriver {
         this._retryPolicy = retryPolicy;
 
         if (maxConcurrentTransactions < 0) {
-            throw new RangeError("Value for poolLimit cannot be negative.");
+            throw new RangeError("Value for maxConcurrentTransactions cannot be negative.");
         }
 
         let maxSockets: number;
@@ -157,18 +158,26 @@ export class QldbDriver {
         let session: QldbSession = null;
         retryPolicy = (retryPolicy == null) ? this._retryPolicy : retryPolicy;
         const transactionExecutionContext: TransactionExecutionContext = new TransactionExecutionContext();
+        let get_session_attempt = 0;
         while(true) {
             try  {
+                get_session_attempt += 1;
                 session = await this.getSession();
                 return await session.executeLambda(transactionLambda, retryPolicy, transactionExecutionContext);
             } catch(err) {
-                if (err instanceof StartTransactionError || isInvalidSessionException(err)) {
-                    continue;
+                /* This is a guard condition to prevent the driver from entering an infinite loop
+                if all the sessions start resulting in InvalidSessionException */
+                if (get_session_attempt >= this._maxConcurrentTransactions + 3) {
+                    throw err;
                 }
-                throw err;
+                //If it is ISE but not because of transaction expiry, then pick new session and retry the transaction
+                if (isInvalidSessionException(err) && !isTransactionExpiredException(err) ) {
+                    continue;
+                } else {
+                    throw err;
+                }
             } finally {
                 if (session != null) {
-                    //CFR: In the follow-up CR when we change the pooleing
                     this._returnSessionToPool(session);
                 }
             }

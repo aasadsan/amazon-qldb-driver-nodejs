@@ -17,7 +17,7 @@ import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import { dom } from "ion-js";
 
-import { SessionPoolEmptyError, DriverClosedError } from "../errors/Errors";
+import { isTransactionExpiredException, DriverClosedError, SessionPoolEmptyError } from "../errors/Errors";
 import { QldbDriver } from "../QldbDriver";
 import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
@@ -116,6 +116,21 @@ describe("SessionManagement", function() {
             if (!(e instanceof DriverClosedError)) {
                 throw e;
             }
+        }
+    });
+
+    it("Throws exception when transaction expires due to timeout", async() => {
+        const driver: QldbDriver = new QldbDriver(constants.LEDGER_NAME, config);
+        let error;
+        try {
+            error = await chai.expect(driver.executeLambda(async (txn: TransactionExecutor) => {
+                //Wait for transaction to expire
+                await new Promise(resolve => setTimeout(resolve, 40000));
+            })).to.be.rejected;
+            console.log("error in the test ", error);
+        } finally {
+            console.log("error in the finally block", error);
+            chai.assert.isTrue(isTransactionExpiredException(error));
         }
     });
 });

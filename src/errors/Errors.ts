@@ -15,6 +15,8 @@ import { AWSError } from "aws-sdk";
 
 import { error } from "../LogUtil";
 
+const transactionExpiredPattern = RegExp("Transaction .* has expired");
+
 export class ClientException extends Error {
     constructor(message: string) {
         super(message);
@@ -116,6 +118,16 @@ export function isInvalidSessionException(e: AWSError): boolean {
 }
 
 /**
+ * Is the exception because the transaction expired? The transaction expiry is a message wrapped
+ * inside InvalidSessionException
+ * @param e The client error to check to see if it is an InvalidSessionException due to transaction expiry.
+ * @returns Whether or not the exception is is an InvalidSessionException due to transaction expiry.
+ */
+export function isTransactionExpiredException(e: AWSError): boolean {
+    return e.code === "InvalidSessionException" && transactionExpiredPattern.test(e.message);
+}
+
+/**
  * Is the exception an OccConflictException?
  * @param e The client error caught.
  * @returns True if the exception is an OccConflictException. False otherwise.
@@ -140,6 +152,15 @@ export function isResourceNotFoundException(e: AWSError): boolean {
  */
 export function isResourcePreconditionNotMetException(e: AWSError): boolean {
     return e.code === "ResourcePreconditionNotMetException";
+}
+
+/**
+ * Is the exception a BadRequestException?
+ * @param e The client error to check to see if it is a BadRequestException.
+ * @returns Whether or not the exception is a BadRequestException.
+ */
+export function isBadRequestException(e: AWSError): boolean {
+    return e.code === "BadRequestException";
 }
 
 /**
