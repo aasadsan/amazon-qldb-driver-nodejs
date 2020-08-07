@@ -114,11 +114,12 @@ describe("Errors", () => {
     describe("#StartTransactionError", () => {
         it("should be a StartTransactionError when new StartTransactionError created", () => {
             const logSpy = sandbox.spy(LogUtil, "error");
-            let err: Error = new Error("Some BadRequest Exception")
-            const error = new StartTransactionError(err);
+            let badRequestException: Error = new Error("Some BadRequest Exception")
+            const error = new StartTransactionError(badRequestException);
             chai.expect(error).to.be.instanceOf(StartTransactionError);
             chai.assert.equal(error.name, "StartTransactionError");
             sinon.assert.calledOnce(logSpy);
+            chai.assert.equal(error.cause, badRequestException);
         });
     });
     describe("#isInvalidParameterException()", () => {

@@ -25,7 +25,7 @@ import {
 import { warn } from "./LogUtil";
 import { Result } from "./Result";
 import { ResultStream } from "./ResultStream";
-import { RetryPolicy } from "./retry/RetryPolicy";
+import { RetryConfig } from "./retry/RetryConfig";
 import { Transaction } from "./Transaction";
 import { TransactionExecutor } from "./TransactionExecutor";
 import { TransactionExecutionContext } from "./TransactionExecutionContext";
@@ -54,7 +54,7 @@ export class QldbSession {
 
     async executeLambda(
         transactionLambda: (transactionExecutor: TransactionExecutor) => any,
-        retryPolicy: RetryPolicy,
+        retryConfig: RetryConfig,
         executionContext: TransactionExecutionContext,
     ): Promise<any> {
         let transaction: Transaction;
@@ -76,7 +76,7 @@ export class QldbSession {
                     throw e;
                 }
 
-                if (executionContext.getExecutionAttempt() >= retryPolicy.getRetryLimit()
+                if (executionContext.getExecutionAttempt() >= retryConfig.getRetryLimit()
                     || e instanceof LambdaAbortedError) {
                     throw e;
                 }
@@ -91,7 +91,7 @@ export class QldbSession {
                 }
             }
             executionContext.incrementExecutionAttempt();
-            await this._retrySleep(executionContext, retryPolicy, transaction);
+            await this._retrySleep(executionContext, retryConfig, transaction);
         }
     }
 
@@ -116,7 +116,7 @@ export class QldbSession {
             if (isBadRequestException(e)) {
                 throw new StartTransactionError(e);
             }
-            throw(e);
+            throw e;
         }
     }
 
@@ -132,9 +132,9 @@ export class QldbSession {
         }
     }
 
-    private _retrySleep(executionContext: TransactionExecutionContext, retryPolicy: RetryPolicy, transaction: Transaction) {
+    private _retrySleep(executionContext: TransactionExecutionContext, retryConfig: RetryConfig, transaction: Transaction) {
         let transactionId: string = (transaction != null) ? transaction.getTransactionId() : null;
-        const backoffFunction: BackoffFunction = retryPolicy.getBackOffFunction();
+        const backoffFunction: BackoffFunction = retryConfig.getBackoffFunction();
         let backoffDelay: number = backoffFunction(executionContext.getExecutionAttempt(), executionContext.getLastException(), transactionId);
         if (backoffDelay == null || backoffDelay < 0) {
             backoffDelay = 0;
@@ -144,12 +144,5 @@ export class QldbSession {
 
     private _sleep(sleepTime: number) {
         return new Promise(resolve => setTimeout(resolve, sleepTime));
-    }
-
-
-    private _throwIfClosed(): void {
-        if (this._isClosed) {
-            throw new SessionClosedError();
-        }
     }
 }

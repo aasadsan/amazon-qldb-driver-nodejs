@@ -23,7 +23,7 @@ import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
 import * as constants from "./TestConstants";
 import { TestUtils } from "./TestUtils";
-import { defaultRetryPolicy } from "../retry/DefaultRetryPolicy";
+import { defaultRetryConfig } from "../retry/DefaultRetryConfig";
 
 chai.use(chaiAsPromised);
 
@@ -84,8 +84,8 @@ describe("SessionManagement", function() {
     });
 
     it("Throws exception when all the sessions are busy and pool limit is reached", async () => {
-        // Set the timeout to 1ms and pool limit to 1
-        const driver: QldbDriver = new  QldbDriver(constants.LEDGER_NAME, config, 1, defaultRetryPolicy);
+        // Set maxConcurrentTransactions to 1
+        const driver: QldbDriver = new  QldbDriver(constants.LEDGER_NAME, config, 1, defaultRetryConfig);
         try {
             // Execute and do not wait for the promise to resolve, exhausting the pool
             driver.executeLambda(async (txn: TransactionExecutor) => {
@@ -124,12 +124,10 @@ describe("SessionManagement", function() {
         let error;
         try {
             error = await chai.expect(driver.executeLambda(async (txn: TransactionExecutor) => {
-                //Wait for transaction to expire
+                // Wait for transaction to expire
                 await new Promise(resolve => setTimeout(resolve, 40000));
             })).to.be.rejected;
-            console.log("error in the test ", error);
         } finally {
-            console.log("error in the finally block", error);
             chai.assert.isTrue(isTransactionExpiredException(error));
         }
     });

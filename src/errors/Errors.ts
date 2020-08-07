@@ -119,7 +119,7 @@ export function isInvalidSessionException(e: AWSError): boolean {
 
 /**
  * Is the exception because the transaction expired? The transaction expiry is a message wrapped
- * inside InvalidSessionException
+ * inside InvalidSessionException.
  * @param e The client error to check to see if it is an InvalidSessionException due to transaction expiry.
  * @returns Whether or not the exception is is an InvalidSessionException due to transaction expiry.
  */

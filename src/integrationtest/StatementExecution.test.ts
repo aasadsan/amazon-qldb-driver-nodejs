@@ -22,7 +22,7 @@ import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
 import * as constants from "./TestConstants";
 import { TestUtils } from "./TestUtils";
-import { RetryPolicy } from "../retry/RetryPolicy";
+import { RetryConfig } from "../retry/RetryConfig";
 
 const itParam = require("mocha-param");
 chai.use(chaiAsPromised);
@@ -264,8 +264,8 @@ describe("StatementExecution", function() {
         chai.assert.equal(result, 1);
         
         // Create a driver that does not retry OCC errors
-        const retryPolicy:RetryPolicy = new RetryPolicy(0);
-        const noRetryDriver: QldbDriver = new QldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration(), 3, retryPolicy);
+        const retryConfig: RetryConfig = new RetryConfig(0);
+        const noRetryDriver: QldbDriver = new QldbDriver(constants.LEDGER_NAME, testUtils.createClientConfiguration(), 3, retryConfig);
         async function updateField(driver: QldbDriver): Promise<void> {
             await driver.executeLambda(async (txn: TransactionExecutor) => {
                 let currentValue: number;
@@ -283,6 +283,7 @@ describe("StatementExecution", function() {
         try {   
             await Promise.all([updateField(noRetryDriver), updateField(noRetryDriver), updateField(noRetryDriver)]);
         } catch (e) {
+            console.log("THE EXCEPTION IS ", e);
             if (isOccConflictException(e)) {
                 occFlag = true;
             }

@@ -34,11 +34,11 @@ import * as LogUtil from "../LogUtil";
 import { QldbSession } from "../QldbSession";
 import { Result } from "../Result";
 import { ResultStream } from "../ResultStream";
-import { Transaction } from "../Transaction";
-import { Session } from "inspector";
-import { TransactionExecutionContext } from "../TransactionExecutionContext";
-import { defaultRetryPolicy } from "../retry/DefaultRetryPolicy";
 import { BackoffFunction } from "../retry/BackoffFunction";
+import { defaultRetryConfig } from "../retry/DefaultRetryConfig";
+import { Transaction } from "../Transaction";
+import { TransactionExecutionContext } from "../TransactionExecutionContext";
+import { AWSError } from "aws-sdk";
 
 chai.use(chaiAsPromised);
 const sandbox = sinon.createSandbox();
@@ -148,7 +148,7 @@ describe("QldbSession", () => {
 
             const result = await qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
-            }, defaultRetryPolicy, executionContext);
+            }, defaultRetryConfig, executionContext);
             sinon.assert.calledOnce(executeSpy);
             sinon.assert.calledWith(executeSpy, testStatement);
             sinon.assert.calledOnce(startTransactionSpy);
@@ -174,7 +174,7 @@ describe("QldbSession", () => {
 
             const result = await qldbSession.executeLambda(async (txn) => {
                 return await txn.executeAndStreamResults(testStatement);
-            }, defaultRetryPolicy, executionContext);
+            }, defaultRetryConfig, executionContext);
             sinon.assert.calledOnce(executeAndStreamResultsSpy);
             sinon.assert.calledWith(executeAndStreamResultsSpy, testStatement);
             sinon.assert.calledOnce(startTransactionSpy);
@@ -193,7 +193,7 @@ describe("QldbSession", () => {
 
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
-            }, defaultRetryPolicy, executionContext)).to.be.rejected;
+            }, defaultRetryConfig, executionContext)).to.be.rejected;
             sinon.assert.calledOnce(startTransactionSpy);
         });
 
@@ -209,7 +209,7 @@ describe("QldbSession", () => {
             const noThrowAbortSpy = sandbox.spy(qldbSession as any, "_noThrowAbort");
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
-            }, defaultRetryPolicy, executionContext)).to.be.rejectedWith(Errors.StartTransactionError);
+            }, defaultRetryConfig, executionContext)).to.be.rejectedWith(Errors.StartTransactionError);
             sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
             sinon.assert.callCount(noThrowAbortSpy, testRetryLimit);
         });
@@ -226,7 +226,7 @@ describe("QldbSession", () => {
             const noThrowAbortSpy = sandbox.spy(qldbSession as any, "_noThrowAbort");
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 return await txn.execute(testStatement);
-            }, defaultRetryPolicy, executionContext)).to.be.rejected;
+            }, defaultRetryConfig, executionContext)).to.be.rejected;
             sinon.assert.callCount(startTransactionSpy, 1);
             sinon.assert.neverCalledWith(noThrowAbortSpy);
         });
@@ -241,7 +241,7 @@ describe("QldbSession", () => {
 
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 throw new Error(testMessage);
-            }, defaultRetryPolicy, executionContext)).to.be.rejected;
+            }, defaultRetryConfig, executionContext)).to.be.rejected;
 
             sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
             sinon.assert.neverCalledWith(noThrowAbortSpy, testRetryLimit + 1);
@@ -258,7 +258,7 @@ describe("QldbSession", () => {
 
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 throw new Error(testMessage);
-            }, defaultRetryPolicy, executionContext)).to.be.rejected;
+            }, defaultRetryConfig, executionContext)).to.be.rejected;
 
             sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
             sinon.assert.callCount(noThrowAbortSpy, testRetryLimit);
@@ -271,20 +271,29 @@ describe("QldbSession", () => {
 
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 throw new Error("ISE");
-            }, defaultRetryPolicy, executionContext)).to.be.rejected;
+            }, defaultRetryConfig, executionContext)).to.be.rejected;
 
            chai.assert.isFalse(qldbSession.isSessionOpen());
         });
 
         it("should return a rejected promise when Transaction expires", async () => {
-            chai.assert(true);
+            const error = new Error("InvalidSession") as AWSError;
+            error.code = "InvalidSessionException";
+            error.message = "Transaction ABC has expired";
+            const communicatorTransactionSpy = sandbox.spy(mockCommunicator, "startTransaction");
+
+            let result = await chai.expect(qldbSession.executeLambda(async (txn) => {
+                throw error;
+            }, defaultRetryConfig, executionContext)).to.be.rejected;
+            sinon.assert.calledOnce(communicatorTransactionSpy);
+            chai.assert.equal(result.message, error.message);
         });
 
         it("should return a rejected promise when a LambdaAbortedError occurs", async () => {
             const lambdaAbortedError: Errors.LambdaAbortedError = new Errors.LambdaAbortedError();
             await chai.expect(qldbSession.executeLambda(async (txn) => {
                 throw lambdaAbortedError;
-            }, defaultRetryPolicy, executionContext)).to.be.rejected;
+            }, defaultRetryConfig, executionContext)).to.be.rejected;
         });
 
     });
@@ -307,19 +316,6 @@ describe("QldbSession", () => {
             sinon.assert.calledOnce(communicatorTransactionSpy);
         });
 
-    });
-
-    describe("#_throwIfClosed()", () => {
-        it("should not throw if not closed", () => {
-            chai.expect(qldbSession["_throwIfClosed"]()).to.not.throw;
-        });
-
-        it("should throw SessionClosedError if closed", () => {
-            qldbSession["_isClosed"] = true;
-            chai.expect(() => {
-                qldbSession["_throwIfClosed"]();
-            }).to.throw(Errors.SessionClosedError);
-        });
     });
 
     describe("#_noThrowAbort()", () => {
@@ -347,36 +343,36 @@ describe("QldbSession", () => {
     });
 
     describe("#RetryDelayTime()", () => {
-        /* This test accompolishes two things
-            1. Tests that default retry policy increases delay exponentially (when math.random is overriden to return 1)
-            2. The _sleep method  gets called  with the calculated delay time
+        /* Test that the 
+            1. Default retry policy increases delay exponentially (when math.random is overriden to return 1)
+            2. _sleep method gets called with the calculated delay time
         */
-        it("should increase delay exponentially when called with DefaultRetryPolicy", async () => {
+        it("should increase delay exponentially when called with DefaultRetryConfig", async () => {
             const sleepSpy = sandbox.stub(qldbSession as any ,"_sleep");
             const mathRandStub = sandbox.stub(Math, "random");
             mathRandStub.returns(1);
             let executionContext: TransactionExecutionContext = new TransactionExecutionContext();
-            let defaultBackOffFunction:BackoffFunction = defaultRetryPolicy.getBackOffFunction(); 
+            let defaultBackOffFunction: BackoffFunction = defaultRetryConfig.getBackoffFunction(); 
 
             //Increment the attempt number to 1 and determine what the delay time would be when using default retry policy
             executionContext.incrementExecutionAttempt();
             const delayTime1: number = defaultBackOffFunction(executionContext.getExecutionAttempt(), null, null);
-            await qldbSession["_retrySleep"](executionContext, defaultRetryPolicy, mockTransaction);
-            //verify sleep method was called with correct delay Time
+            await qldbSession["_retrySleep"](executionContext, defaultRetryConfig, mockTransaction);
+            //Verify sleep method was called with correct delay Time
             sleepSpy.calledWith(delayTime1);
 
             //Increment the attempt number to 2 and determine what the delay time would be when using default retry policy
             executionContext.incrementExecutionAttempt();
             const delayTime2: number = defaultBackOffFunction(executionContext.getExecutionAttempt(), null, null);
-            await qldbSession["_retrySleep"](executionContext, defaultRetryPolicy, mockTransaction);
-            //verify sleep method was called with correct delay Time
+            await qldbSession["_retrySleep"](executionContext, defaultRetryConfig, mockTransaction);
+            //Verify sleep method was called with correct delay Time
             sleepSpy.calledWith(delayTime2);
 
             //Increment the attempt number to 3 and determine what the delay time would be when using default retry policy
             executionContext.incrementExecutionAttempt();
             const delayTime3: number = defaultBackOffFunction(executionContext.getExecutionAttempt(), null, null);
-            await qldbSession["_retrySleep"](executionContext, defaultRetryPolicy, mockTransaction);
-            //verify sleep method was called with correct delay Time
+            await qldbSession["_retrySleep"](executionContext, defaultRetryConfig, mockTransaction);
+            //Verify sleep method was called with correct delay Time
             sleepSpy.calledWith(delayTime3);
 
             //Verify that delayTime3 = 2 * delayTime2 and delayTime2 = 2 * delayTime1

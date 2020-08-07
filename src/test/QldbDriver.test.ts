@@ -26,9 +26,9 @@ import { DriverClosedError, SessionPoolEmptyError } from "../errors/Errors";
 import * as LogUtil from "../LogUtil";
 import { QldbDriver } from "../QldbDriver";
 import { QldbSession } from "../QldbSession";
+import { defaultRetryConfig } from "../retry/DefaultRetryConfig";
 import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
-import { defaultRetryPolicy } from "../retry/DefaultRetryPolicy";
 import { TransactionExecutionContext } from "../TransactionExecutionContext";
 
 chai.use(chaiAsPromised);
@@ -108,8 +108,8 @@ describe("QldbDriver", () => {
             chai.assert.deepEqual(qldbDriver["_sessionPool"], []);
             chai.assert.instanceOf(qldbDriver["_semaphore"], Semaphore);
             chai.assert.equal(qldbDriver["_semaphore"]["permits"], mockAgent.maxSockets);
-            chai.assert.equal(qldbDriver["_retryPolicy"], defaultRetryPolicy);
-            chai.assert.equal(qldbDriver["_retryPolicy"]["_retryLimit"], testDefaultRetryLimit);
+            chai.assert.equal(qldbDriver["_retryConfig"], defaultRetryConfig);
+            chai.assert.equal(qldbDriver["_retryConfig"]["_retryLimit"], testDefaultRetryLimit);
         });
 
         it("should throw a RangeError when retryLimit less than zero passed in", () => {
@@ -164,11 +164,11 @@ describe("QldbDriver", () => {
                 return true;
             };
 
-            const result = await qldbDriver.executeLambda(lambda, defaultRetryPolicy);
+            const result = await qldbDriver.executeLambda(lambda, defaultRetryConfig);
 
             chai.assert.equal(result, mockResult);
             sinon.assert.calledOnce(executeLambdaSpy);
-            sinon.assert.calledWith(executeLambdaSpy, lambda, defaultRetryPolicy, executionContext);
+            sinon.assert.calledWith(executeLambdaSpy, lambda, defaultRetryConfig, executionContext);
         });
 
         /**
@@ -218,7 +218,7 @@ describe("QldbDriver", () => {
             semaphoreStub.returns(true);
 
             let initialPermits = qldbDriver["_availablePermits"];
-            const result = await qldbDriver.executeLambda(lambda, defaultRetryPolicy);
+            const result = await qldbDriver.executeLambda(lambda, defaultRetryConfig);
 
             //Ensure that the transaction was eventually completed
             chai.assert.isTrue(result);
@@ -236,13 +236,11 @@ describe("QldbDriver", () => {
             const lambda = (transactionExecutor: TransactionExecutor) => {
                 return true;
             };
-            console.log("Got int this test");
             const error = new Error("InvalidSession") as AWSError;
             error.code = "InvalidSessionException";
             error.message = "Transaction ABC has expired";
 
             mockSession1.executeLambda = async () => {
-                console.log("Throwing error");
                 throw error;
             };
             mockSession1["_isClosed"] = true;
@@ -256,22 +254,23 @@ describe("QldbDriver", () => {
             }
 
             mockSession2.executeLambda = async () => {
-                console.log("This should never be called");
+                // This should never be called
+                return true;
             };
 
             qldbDriver["_sessionPool"] = [mockSession2, mockSession1];
             const executeLambdaSpy1 = sandbox.spy(mockSession1, "executeLambda");
             const executeLambdaSpy2 = sandbox.spy(mockSession2, "executeLambda");
-            const result = await chai.expect(qldbDriver.executeLambda(lambda, defaultRetryPolicy)).to.be.rejected;
+            const result = await chai.expect(qldbDriver.executeLambda(lambda, defaultRetryConfig)).to.be.rejected;
             chai.assert.equal(result.code, error.code);
 
             sinon.assert.calledOnce(executeLambdaSpy1);
-            sinon.assert.calledWith(executeLambdaSpy1, lambda, defaultRetryPolicy, executionContext);
+            sinon.assert.calledWith(executeLambdaSpy1, lambda, defaultRetryConfig, executionContext);
 
             sinon.assert.notCalled(executeLambdaSpy2);
         });
 
-        it("should retry only upto maxConcurrentTransactions + 3 times when there is ISE", async () => {
+        it("should retry only up to maxConcurrentTransactions + 3 times when there is ISE", async () => {
             const mockSession1: QldbSession = <QldbSession><any> sandbox.mock(QldbSession);
             mockSession1.executeLambda = async () => {
                 const error = new Error("InvalidSession") as AWSError;
@@ -301,7 +300,7 @@ describe("QldbDriver", () => {
             qldbDriver["_maxConcurrentTransactions"] = 1;
             qldbDriver["_sessionPool"] = [mockSession1, mockSession1, mockSession1, mockSession1, mockSession1];
             const executeLambdaSpy1 = sandbox.spy(mockSession1, "executeLambda");
-            const result = await chai.expect(qldbDriver.executeLambda(lambda, defaultRetryPolicy)).to.be.rejected;
+            const result = await chai.expect(qldbDriver.executeLambda(lambda, defaultRetryConfig)).to.be.rejected;
             chai.assert.equal(result.code, error.code);
             sinon.assert.callCount(executeLambdaSpy1, qldbDriver["_maxConcurrentTransactions"] + 3);
         });
@@ -312,7 +311,7 @@ describe("QldbDriver", () => {
             };
 
             qldbDriver["_isClosed"] = true;
-            chai.expect(qldbDriver.executeLambda(lambda, defaultRetryPolicy)).to.be.rejectedWith(DriverClosedError);
+            chai.expect(qldbDriver.executeLambda(lambda, defaultRetryConfig)).to.be.rejectedWith(DriverClosedError);
         });
 
         it("should return a SessionPoolEmptyError wrapped in a rejected promise when session pool empty", async () => {
