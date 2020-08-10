@@ -13,7 +13,6 @@
 
 import { StartTransactionResult } from "aws-sdk/clients/qldbsession";
 import { Communicator } from "./Communicator";
-
 import { BackoffFunction } from "./retry/BackoffFunction";
 import {
     isBadRequestException,

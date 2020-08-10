@@ -69,7 +69,7 @@ export class QldbDriver {
      * @param qldbClientOptions The object containing options for configuring the low level client.
      *                          See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/QLDBSession.html#constructor-details|Low Level Client Constructor}.
      * @param maxConcurrentTransactions The driver internally uses a pool of sessions to execute the transactions.
-     *                                  The maxConcurrentTransactions parameter specifies the number of sessions that the driver can hold in the pool. 
+     *                                  The maxConcurrentTransactions parameter specifies the number of sessions that the driver can hold in the pool.
      *                                  The default is set to maximum number of sockets specified in the globalAgent.
      *                                  See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
      * @param RetryConfig Config to specify max number of retries, base and custom backoff strategy for retries. Will be overridden if a different retry_config
@@ -149,7 +149,7 @@ export class QldbDriver {
      * @param transactionFunction The function representing a transaction to be executed. Please see the method docs to understand the usage of this parameter.
      * @param retryConfig Config to specify max number of retries, base and custom backoff strategy for retries. This config 
      *                    overrides the retry config set at driver level for a particular lambda execution.
-     *                    Note that all the values of the driver level retry config will be overriden by the new config passed here.
+     *                    Note that all the values of the driver level retry config will be overridden by the new config passed here.
      * @throws {@linkcode DriverClosedError} When a transaction is attempted on a closed driver instance. {@linkcode close}
      * @throws {@linkcode ClientException} When the commit digest from commit transaction result does not match.
      * @throws {@linkcode SessionPoolEmptyError} When maxConcurrentTransactions limit is reached and there is no session available in the pool.
