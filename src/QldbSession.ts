@@ -75,10 +75,6 @@ export class QldbSession {
                     throw e;
                 }
 
-                if (e instanceof LambdaAbortedError) {
-                    throw e;
-                }
-
                 if (!isOccConflictException(e)) {
                     this._noThrowAbort(transaction);
                 }
