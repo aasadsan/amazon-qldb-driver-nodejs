@@ -17,13 +17,13 @@ import * as chai from "chai";
 import * as chaiAsPromised from "chai-as-promised";
 import { dom } from "ion-js";
 
+import { defaultRetryConfig } from "../retry/DefaultRetryConfig";
 import { isTransactionExpiredException, DriverClosedError, SessionPoolEmptyError } from "../errors/Errors";
 import { QldbDriver } from "../QldbDriver";
 import { Result } from "../Result";
 import { TransactionExecutor } from "../TransactionExecutor";
 import * as constants from "./TestConstants";
 import { TestUtils } from "./TestUtils";
-import { defaultRetryConfig } from "../retry/DefaultRetryConfig";
 
 chai.use(chaiAsPromised);
 

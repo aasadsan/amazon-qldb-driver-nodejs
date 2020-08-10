@@ -19,6 +19,7 @@ import Semaphore from "semaphore-async-await";
 
 import { version } from "../package.json";
 import { Communicator } from "./Communicator";
+import { defaultRetryConfig } from "./retry/DefaultRetryConfig";
 import { 
     DriverClosedError, 
     isInvalidSessionException,
@@ -26,7 +27,6 @@ import {
     SessionPoolEmptyError,
  } from "./errors/Errors";
 import { debug } from "./LogUtil";
-import { defaultRetryConfig } from "./retry/DefaultRetryConfig";
 import { QldbSession } from "./QldbSession";
 import { Result } from "./Result";
 import { RetryConfig } from "./retry/RetryConfig";
@@ -68,13 +68,13 @@ export class QldbDriver {
      * @param ledgerName The name of the ledger you want to connect to. This is a mandatory parameter.
      * @param qldbClientOptions The object containing options for configuring the low level client.
      *                          See {@link https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/QLDBSession.html#constructor-details|Low Level Client Constructor}.
-     * @param maxConcurrentTransactions The driver internally uses a pool of sessions to execute the transactions. The maxConcurrentTransactions parameter
-     *                  specifies the number of sessions that the driver can hold in the pool. The default is set to maximum number of sockets specified in the globalAgent.
-     *                  See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
+     * @param maxConcurrentTransactions The driver internally uses a pool of sessions to execute the transactions.
+     *                                  The maxConcurrentTransactions parameter specifies the number of sessions that the driver can hold in the pool. 
+     *                                  The default is set to maximum number of sockets specified in the globalAgent.
+     *                                  See {@link https://docs.aws.amazon.com/qldb/latest/developerguide/driver.best-practices.html#driver.best-practices.configuring} for more details.
      * @param RetryConfig Config to specify max number of retries, base and custom backoff strategy for retries. Will be overridden if a different retry_config
      *                    is passed to {@linkcode executeLambda}.
      *
-     * @throws RangeError if `retryLimit` is less than 0.
      * @throws RangeError if `maxConcurrentTransactions` is less than 0.
      */
     constructor(
@@ -147,12 +147,12 @@ export class QldbDriver {
      * The retryIndicator will be called with the current attempt number.
      *
      * @param transactionFunction The function representing a transaction to be executed. Please see the method docs to understand the usage of this parameter.
-     * @param retryConfig Config to specify max number of retries, base and custom backoff strategy for retries.This config 
-     *                      overrides the retry config set at driver level for a particular lambda execution.
-     *                      Note that all the values of the driver level retry config will be overwritten by the new config passed here.
+     * @param retryConfig Config to specify max number of retries, base and custom backoff strategy for retries. This config 
+     *                    overrides the retry config set at driver level for a particular lambda execution.
+     *                    Note that all the values of the driver level retry config will be overriden by the new config passed here.
      * @throws {@linkcode DriverClosedError} When a transaction is attempted on a closed driver instance. {@linkcode close}
-     * @throws {@linkcode ClientException} when the commit digest from commit transaction result does not match.
-     * @throws {@linkcode SessionPoolEmptyError} When maxConcurrentTransactions limit is reached and there are no session available in the pool.
+     * @throws {@linkcode ClientException} When the commit digest from commit transaction result does not match.
+     * @throws {@linkcode SessionPoolEmptyError} When maxConcurrentTransactions limit is reached and there is no session available in the pool.
      * @throws {@linkcode InvalidSessionException} When a session expires either due to a long running transaction or session being idle for long time.
      * @throws {@linkcode BadRequestException} When Amazon QLDB is not able to execute a query or transaction.
      */
@@ -163,17 +163,17 @@ export class QldbDriver {
         let session: QldbSession = null;
         retryConfig = (retryConfig == null) ? this._retryConfig : retryConfig;
         const transactionExecutionContext: TransactionExecutionContext = new TransactionExecutionContext();
-        let get_session_attempt: number = 0;
+        let getSessionAttempt: number = 0;
         while(true) {
             try  {
-                get_session_attempt += 1;
+                getSessionAttempt += 1;
                 session = await this.getSession();
                 return await session.executeLambda(transactionLambda, retryConfig, transactionExecutionContext);
             } catch(err) {
                 /* This is a guard condition to prevent the driver from entering an infinite loop
                 if all the sessions start resulting in InvalidSessionException 
                 */
-                if (get_session_attempt >= this._maxConcurrentTransactions + 3) {
+                if (getSessionAttempt >= this._maxConcurrentTransactions + 3) {
                     throw err;
                 }
                 //If it is ISE but not because of transaction expiry, then pick new session and retry the transaction

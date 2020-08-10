@@ -19,10 +19,10 @@ import { dom, IonType } from "ion-js";
 import { isOccConflictException } from "../errors/Errors";
 import { QldbDriver } from "../QldbDriver";
 import { Result } from "../Result";
+import { RetryConfig } from "../retry/RetryConfig";
 import { TransactionExecutor } from "../TransactionExecutor";
 import * as constants from "./TestConstants";
 import { TestUtils } from "./TestUtils";
-import { RetryConfig } from "../retry/RetryConfig";
 
 const itParam = require("mocha-param");
 chai.use(chaiAsPromised);
@@ -283,7 +283,6 @@ describe("StatementExecution", function() {
         try {   
             await Promise.all([updateField(noRetryDriver), updateField(noRetryDriver), updateField(noRetryDriver)]);
         } catch (e) {
-            console.log("THE EXCEPTION IS ", e);
             if (isOccConflictException(e)) {
                 occFlag = true;
             }

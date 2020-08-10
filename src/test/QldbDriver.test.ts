@@ -34,12 +34,10 @@ import { TransactionExecutionContext } from "../TransactionExecutionContext";
 chai.use(chaiAsPromised);
 const sandbox = sinon.createSandbox();
 
-const testDefaultTimeout: number = 30000;
 const testDefaultRetryLimit: number = 4;
 const testLedgerName: string = "LedgerName";
 const testMaxRetries: number = 0;
 const testMaxSockets: number = 10;
-const testMessage: string = "testMessage";
 const mockSessionToken: string = "sessionToken1";
 const testTableNames: string[] = ["Vehicle", "Person"];
 const testSendCommandResult: SendCommandResult = {

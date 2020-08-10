@@ -13,13 +13,14 @@
 
 import { StartTransactionResult } from "aws-sdk/clients/qldbsession";
 import { Communicator } from "./Communicator";
+
+import { BackoffFunction } from "./retry/BackoffFunction";
 import {
     isBadRequestException,
     isInvalidSessionException,
     isOccConflictException,
     isRetriableException,
     LambdaAbortedError,
-    SessionClosedError,
     StartTransactionError,
 } from "./errors/Errors";
 import { warn } from "./LogUtil";
@@ -29,7 +30,6 @@ import { RetryConfig } from "./retry/RetryConfig";
 import { Transaction } from "./Transaction";
 import { TransactionExecutor } from "./TransactionExecutor";
 import { TransactionExecutionContext } from "./TransactionExecutionContext";
-import { BackoffFunction } from "./retry/BackoffFunction";
 
 export class QldbSession {
     private _communicator: Communicator;
@@ -76,16 +76,20 @@ export class QldbSession {
                     throw e;
                 }
 
-                if (executionContext.getExecutionAttempt() >= retryConfig.getRetryLimit()
-                    || e instanceof LambdaAbortedError) {
+                if (e instanceof LambdaAbortedError) {
+                    throw e;
+                }
+
+                if (!isOccConflictException(e)) {
+                    this._noThrowAbort(transaction);
+                }
+
+                if (executionContext.getExecutionAttempt() >= retryConfig.getRetryLimit()) {
                     throw e;
                 }
 
                 if (e instanceof StartTransactionError || isRetriableException(e) || isOccConflictException(e)) {
                     warn(`OCC conflict or retriable exception occurred: ${e}.`);
-                    if (!isOccConflictException(e)) {
-                        this._noThrowAbort(transaction);
-                    }
                 } else {
                     throw e;
                 }

@@ -211,7 +211,7 @@ describe("QldbSession", () => {
                 return await txn.execute(testStatement);
             }, defaultRetryConfig, executionContext)).to.be.rejectedWith(Errors.StartTransactionError);
             sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
-            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit);
+            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit + 1);
         });
 
         it("should not retry with same session when startTransaction fails with InvalidSessionException", async () => {
@@ -261,7 +261,7 @@ describe("QldbSession", () => {
             }, defaultRetryConfig, executionContext)).to.be.rejected;
 
             sinon.assert.callCount(startTransactionSpy, testRetryLimit + 1);
-            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit);
+            sinon.assert.callCount(noThrowAbortSpy, testRetryLimit + 1);
             sinon.assert.callCount(logSpy, testRetryLimit);
         });
 

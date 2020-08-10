@@ -29,6 +29,7 @@ export class RetryConfig {
     *                        of time to delay in milliseconds. If the result is a non-zero negative value the backoff will
     *                        be considered to be zero. If no backoff function is provided then {@linkcode defaultBackoffFunction} will be used.
     *
+    * @throws RangeError if `retryLimit` is less than 0.
     */
     constructor(retryLimit: number = 4, backoffFunction: BackoffFunction = defaultBackoffFunction) {
         if (retryLimit < 0) {
