@@ -1,3 +1,24 @@
+# 2.0.0-rc.1 (2020-08-13)
+
+***Note: This version is a release candidate and may not be production ready.***
+
+## :tada: Enchancements
+
+* Added support for defining customer retry config and backoffs.
+
+## :boom: Breaking changes
+
+* Renamed `QldbDriver` property `poolLimit` to `maxConcurrentTransactions`.
+* Removed `QldbDriver` property `poolTimeout`. This would mean that if the driver has reached `maxConcurrentTransactions` limit and there are no sessions available in the pool to execute the transaction, then it will immediately throw `SessionPoolEmptyError`.
+* Removed `retryIndicator` from `QldbSession.executeLambda` method and replaced it with `retryConfig`.
+* Moved `retryLimit` from `QldbDriver` constructor to `RetryConfig` constructor.
+
+* The classes and methods marked deprecated in version v1.0.0 have now been removed. From the previous release deprecation notes:
+
+  * `PooledQldbDriver` has been deprecated and will be removed in future versions. Please use `QldbDriver` instead.
+  * `QldbSession.getTableNames`  method has been deprecated and will be removed in future versions. Please use `QldbDriver.getTableNames` method instead.
+  * `QldbSession.executeLambda`  method has been deprecated and will be removed in future versions. Please use `QldbDriver.executeLambda` method instead.
+
 # 1.0.0 (2020-06-05)
 
 The release candidate 2 (v1.0.0-rc.2) has been selected as a final release of v1.0.0. No new changes are introduced between v1.0.0-rc.2 and v1.0.0.
