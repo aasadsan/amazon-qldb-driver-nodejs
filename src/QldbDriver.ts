@@ -163,17 +163,17 @@ export class QldbDriver {
         let session: QldbSession = null;
         retryConfig = (retryConfig == null) ? this._retryConfig : retryConfig;
         const transactionExecutionContext: TransactionExecutionContext = new TransactionExecutionContext();
-        let getSessionAttempt: number = 0;
+        let transactionExecutionAttempt: number = 0;
         while(true) {
             try  {
-                getSessionAttempt += 1;
+                transactionExecutionAttempt += 1;
                 session = await this.getSession();
                 return await session.executeLambda(transactionLambda, retryConfig, transactionExecutionContext);
             } catch(err) {
                 /* This is a guard condition to prevent the driver from entering an infinite loop
                 if all the sessions start resulting in InvalidSessionException 
                 */
-                if (getSessionAttempt >= this._maxConcurrentTransactions + 3) {
+                if (transactionExecutionAttempt >= this._maxConcurrentTransactions + 3) {
                     throw err;
                 }
                 //If it is ISE but not because of transaction expiry, then pick new session and retry the transaction
