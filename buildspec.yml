@@ -1,8 +1,5 @@
 version: 0.2 
  
-env:
-  git-credential-helper: yes
-
 phases: 
   install: 
     runtime-versions: 
@@ -14,15 +11,10 @@ phases:
   build: 
     commands: 
       - echo Build started on `date` 
-      - branch=$CODEBUILD_SOURCE_VERSION
-      - echo Using branch $branch of target repositories
       - echo Compiling the Node.js code
       - npm run build
-      - echo Running unit tests
+      - echo Running tests
       - npm test
-
   post_build: 
     commands: 
       - echo Build completed on `date` 
-      - npm run integrationTest
-      - echo Integration tests completed on `date`

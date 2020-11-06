@@ -14,7 +14,7 @@
         "index.ts"
     ],
     "exclude": [
-        "src/test/*",
-        "src/integrationtest/*"
+        "src/integrationtest/*",
+        "src/test/*"
     ]
 }

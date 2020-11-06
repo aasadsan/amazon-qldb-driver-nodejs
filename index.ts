@@ -1,9 +1,11 @@
 export {
+    isBadRequestException,
     isInvalidParameterException,
     isInvalidSessionException,
     isOccConflictException,
     isResourceNotFoundException,
-    isResourcePreconditionNotMetException
+    isResourcePreconditionNotMetException,
+    isTransactionExpiredException
 } from "./src/errors/Errors";
 export { QldbDriver } from "./src/QldbDriver";
 export { Result } from "./src/Result";

@@ -5,7 +5,7 @@ Please check the [release notes](http://github.com/awslabs/amazon-qldb-driver-no
 
 # 2.0.0-rc.1 (2020-08-13)
 
-***Note: This version is a release candidate and may not be production ready.***
+***Note: This version is a release candidate. We might introduce some additional changes before releasing v2.0.0.***
 
 ## :tada: Enchancements
 
@@ -21,8 +21,8 @@ Please check the [release notes](http://github.com/awslabs/amazon-qldb-driver-no
 * The classes and methods marked deprecated in version v1.0.0 have now been removed. List of classes and methods:
 
   * `PooledQldbDriver` has been removed. Please use `QldbDriver` instead.
-  * `QldbSession.getTableNames`  method has been removed. Please use `QldbDriver.getTableNames` method instead.
-  * `QldbSession.executeLambda`  method has been removed. Please use `QldbDriver.executeLambda` method instead.
+  * `QldbSession.getTableNames` method has been removed. Please use `QldbDriver.getTableNames` method instead.
+  * `QldbSession.executeLambda` method has been removed. Please use `QldbDriver.executeLambda` method instead.
 
 # 1.0.0 (2020-06-05)
 
